@@ -10,6 +10,15 @@ public class BellFordVertex {
 	
 	private IOFSwitch nextHop;
 	
+	private int outPort;
+	
+	// Constructors for Bellman Ford Vertex
+	public BellFordVertex() {
+		this.sw =null;
+		this.cost = -1;
+		this.nextHop = null;
+	}
+	
 	// Constructors for Bellman Ford Vertex
 	public BellFordVertex(IOFSwitch sw, int cost, IOFSwitch nextHop) {
 		this.sw = sw;
@@ -40,6 +49,14 @@ public class BellFordVertex {
 	public void setNextHop(IOFSwitch nextHop) {
 		this.nextHop = nextHop;
 	}
+	
+	public int getOutPort() {
+		return this.outPort;
+	}
+	
+	public void setOutPort(int outPort) {
+		this.cost = outPort;
+	}	
 	
 
 }

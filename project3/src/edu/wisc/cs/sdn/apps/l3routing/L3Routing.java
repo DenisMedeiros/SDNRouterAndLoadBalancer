@@ -9,10 +9,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.openflow.protocol.OFMatch;
+import org.openflow.protocol.OFMatchField;
+import org.openflow.protocol.action.OFAction;
+import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.sun.java.util.jar.pack.Instruction.Switch;
+import com.sun.java.util.jar.pack.*;
 
 import edu.wisc.cs.sdn.apps.util.Host;
 import edu.wisc.cs.sdn.apps.util.SwitchCommands;
@@ -32,7 +36,7 @@ import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryListener;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.routing.Link;
-
+import net.floodlightcontroller.*;
 
 public class L3Routing implements IFloodlightModule, IOFSwitchListener, 
 		ILinkDiscoveryListener, IDeviceListener, IL3Routing
@@ -144,6 +148,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			
 			/*****************************************************************/
 
+			// do calculations for 1 new host
 		}
 	}
 
@@ -168,6 +173,8 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		/* TODO: Update routing: remove rules to route to host               */
 		
 		/*********************************************************************/
+		
+		// go through the tables and remove, don't call algorithm
 	}
 
 	/**
@@ -196,6 +203,10 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		/* TODO: Update routing: change rules to route to host               */
 		
 		/*********************************************************************/
+		
+		// remove from all tables
+		
+		// redo for this host
 	}
 	
     /**
@@ -212,6 +223,8 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		/* TODO: Update routing: change routing rules for all hosts          */
 
 		/*********************************************************************/
+		
+		// recalculate for all hosts
 	}
 
 	/**
@@ -239,7 +252,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			}
 		}
 		
-		// recalculate routes
+		// recalculate for all hosts
 	}
 
 	/**
@@ -392,7 +405,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	}
 	
 	private void bellmanFord() {
-
+		
 		// initially, add all switches to a switch list
 		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
 		
@@ -402,7 +415,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 
 		
 		// for all hosts, find a shortest path
-		for (BellFordVertex srcSw: switches) {
+		for (BellFordVertex srcS w: switches) {
 
 			srcSw.setCost(0);
 			// set all other hosts cost to infinity
@@ -425,6 +438,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 										if (u.getCost() > v.getCost() + 1) {
 											u.setCost(v.getCost() + 1);
 											u.setNextHop(v.getSwitch());
+											u.setOutPort(port);
 										}
 										
 									}
@@ -440,7 +454,101 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			
 			// one iteration for srcSw is complete update these next hops into their 
 			// respective tables
+			for (BellFordVertex dstSw: switches) {
+				OFInstructionApplyActions instructions = new OFInstructionApplyActions();
+				
+				// create a new action with appropriate outgoing port
+				OFActionOutput action = new OFActionOutput();
+				action.setPort(dstSw.getOutPort());
+				
+				// add action to the list of instructions
+				List<OFAction> actionList = new ArrayList<OFAction>();
+				actionList.add(action);
+				instructions.setActions(actionList);
+				
+				// Construct IP packet
+				OFMatch match = new OFMatch();
+				//match.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, srcSw.getSwitch().get);
+				// TODO: const
+			}
+
+			
 		}
+		
+	}
+	
+	private void bellmanFord(Host srcHost) {
+		
+
+		// initially, add all switches to a switch list
+		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
+		IOFSwitch srcSw = srcHost.getSwitch();
+		
+		for (IOFSwitch sw : this.getSwitches().values()) {
+			BellFordVertex tempVertex = new BellFordVertex();
+			if (sw.equals(srcSw))
+				tempVertex = new BellFordVertex(sw, 0, null);
+			else
+				tempVertex = new BellFordVertex(sw, INFINITY, null);
+			switches.add(tempVertex);
+		}
+		
+		// relax the weights
+		for (int i = 2; i < switches.size(); i++) {
+			
+			// go through all links and recalculate costs to each destination from u
+			for (BellFordVertex u: switches) {
+				for (int port: u.getSwitch().getEnabledPortNumbers()) {
+					for (Link link: this.getLinks()) {
+						if (link.getSrc() == port) {
+							
+							for (BellFordVertex v: switches) {
+								if (v.getSwitch().getEnabledPortNumbers().contains(link.getDst())) {
+									
+									if (u.getCost() > v.getCost() + 1) {
+										u.setCost(v.getCost() + 1);
+										u.setNextHop(v.getSwitch());
+										u.setOutPort(port);
+									}
+									
+								}
+							}
+							
+						}
+					}
+				}
+				
+			}
+			
+		}
+		
+		// one iteration for srcSw is complete update these next hops into their 
+		// respective tables
+		for (BellFordVertex dstSw: switches) {
+			
+			if (!dstSw.equals(srcSw)) {
+				
+				OFInstructionApplyActions instructions = new OFInstructionApplyActions();
+				
+				// create a new action with appropriate outgoing port
+				OFActionOutput action = new OFActionOutput();
+				action.setPort(dstSw.getOutPort());
+				
+				// add action to the list of instructions
+				List<OFAction> actionList = new ArrayList<OFAction>();
+				actionList.add(action);
+				instructions.setActions(actionList);
+				
+				// Construct IP packet
+				OFMatch match = new OFMatch();
+				match.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, srcHost.getIPv4Address());
+				
+			}
+
+		}
+
+			
+
 		
 	}
 	
