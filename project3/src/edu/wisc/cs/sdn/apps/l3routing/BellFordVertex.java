@@ -1,5 +1,8 @@
 package edu.wisc.cs.sdn.apps.l3routing;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import net.floodlightcontroller.core.IOFSwitch;
 
 public class BellFordVertex {
@@ -8,22 +11,32 @@ public class BellFordVertex {
 	
 	private int cost;
 	
-	private IOFSwitch nextHop;
-	
 	private int outPort;
+	
+	// keeps the outgoing port to each neighbor
+	private  Map<Integer, BellFordVertex> neighbors;
 	
 	// Constructors for Bellman Ford Vertex
 	public BellFordVertex() {
 		this.sw =null;
 		this.cost = -1;
-		this.nextHop = null;
+		this.neighbors = new HashMap<Integer, BellFordVertex>();
 	}
 	
 	// Constructors for Bellman Ford Vertex
-	public BellFordVertex(IOFSwitch sw, int cost, IOFSwitch nextHop) {
+	public BellFordVertex(IOFSwitch sw, int cost) {
 		this.sw = sw;
 		this.cost = cost;
-		this.nextHop = nextHop;
+		this.neighbors = new HashMap<Integer, BellFordVertex>();
+	}
+	
+	
+	public Map<Integer, BellFordVertex> getNeighbors(){
+		return this.neighbors;
+	}
+	
+	public void addNeighbor(int port, BellFordVertex sw) {
+		neighbors.put(port, sw);
 	}
 	
 	public IOFSwitch getSwitch() {
@@ -42,14 +55,6 @@ public class BellFordVertex {
 		this.cost = cost;
 	}
 	
-	public IOFSwitch getNextHop() {
-		return this.nextHop;
-	}
-	
-	public void setNextHop(IOFSwitch nextHop) {
-		this.nextHop = nextHop;
-	}
-	
 	public int getOutPort() {
 		return this.outPort;
 	}
@@ -57,6 +62,7 @@ public class BellFordVertex {
 	public void setOutPort(int outPort) {
 		this.cost = outPort;
 	}	
+	
 	
 
 }
