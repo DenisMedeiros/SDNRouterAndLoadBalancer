@@ -8,10 +8,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.openflow.protocol.OFMatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.sun.java.util.jar.pack.Instruction.Switch;
+
 import edu.wisc.cs.sdn.apps.util.Host;
+import edu.wisc.cs.sdn.apps.util.SwitchCommands;
 
 import net.floodlightcontroller.core.IFloodlightProviderService;
 import net.floodlightcontroller.core.IOFSwitch;
@@ -28,6 +32,7 @@ import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryListener;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.routing.Link;
+
 
 public class L3Routing implements IFloodlightModule, IOFSwitchListener, 
 		ILinkDiscoveryListener, IDeviceListener, IL3Routing
@@ -51,7 +56,8 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
     
     // Map of hosts to devices
     private Map<IDevice,Host> knownHosts;
-
+    
+    private int INFINITY = 100000000;
 	/**
      * Loads dependencies and initializes data structures.
      */
@@ -137,6 +143,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			/* TODO: Update routing: add rules to route to new host          */
 			
 			/*****************************************************************/
+
 		}
 	}
 
@@ -221,6 +228,18 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		/* TODO: Update routing: change routing rules for all hosts          */
 		
 		/*********************************************************************/
+		OFMatch matchCriteria = new OFMatch();
+
+		// remove switch from all other switch tables
+		for (IOFSwitch swtch: getSwitches().values()) {
+			
+			
+			if (switchId != swtch.getId()) {
+				SwitchCommands.removeRules(swtch, this.table, matchCriteria);
+			}
+		}
+		
+		// recalculate routes
 	}
 
 	/**
@@ -371,4 +390,58 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		modules.add(IDeviceService.class);
         return modules;
 	}
+	
+	private void bellmanFord() {
+
+		// initially, add all switches to a switch list
+		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
+		
+		for (IOFSwitch sw : this.getSwitches().values()) {
+			BellFordVertex tempVertex = new BellFordVertex(sw, 0, null);
+		}
+
+		
+		// for all hosts, find a shortest path
+		for (BellFordVertex srcSw: switches) {
+
+			srcSw.setCost(0);
+			// set all other hosts cost to infinity
+			for (BellFordVertex dstSw: switches) {
+				dstSw.setCost(INFINITY);
+			}
+			
+			// relax the weights
+			for (int i = 2; i < switches.size(); i++) {
+				
+				// go through all links and recalculate costs to each destination from u
+				for (BellFordVertex u: switches) {
+					for (int port: u.getSwitch().getEnabledPortNumbers()) {
+						for (Link link: this.getLinks()) {
+							if (link.getSrc() == port) {
+								
+								for (BellFordVertex v: switches) {
+									if (v.getSwitch().getEnabledPortNumbers().contains(link.getDst())) {
+										
+										if (u.getCost() > v.getCost() + 1) {
+											u.setCost(v.getCost() + 1);
+											u.setNextHop(v.getSwitch());
+										}
+										
+									}
+								}
+								
+							}
+						}
+					}
+					
+				}
+				
+			}
+			
+			// one iteration for srcSw is complete update these next hops into their 
+			// respective tables
+		}
+		
+	}
+	
 }

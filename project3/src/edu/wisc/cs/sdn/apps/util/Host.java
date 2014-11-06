@@ -12,6 +12,9 @@ public class Host
 	/* Floodlight module which is needed to lookup switches by DPID */
 	private IFloodlightProviderService floodlightProv;
 	
+	/* Cost used for Bellman-ford calculations */
+	private int cost;
+	
 	/**
 	 * Create a host.
 	 * @param device meta-data about the host from Floodlight's device manager
@@ -89,4 +92,5 @@ public class Host
 		Host other = (Host)obj;
 		return other.device.equals(this.device);
 	}
+	
 }

@@ -3,7 +3,6 @@ package edu.wisc.cs.sdn.apps.util;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-
 import org.openflow.protocol.OFFlowMod;
 import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFPacketOut;
