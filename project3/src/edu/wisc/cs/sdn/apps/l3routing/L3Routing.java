@@ -406,74 +406,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	
 	private void bellmanFord() {
 		
-		// initially, add all switches to a switch list
-		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
-		
-		for (IOFSwitch sw : this.getSwitches().values()) {
-			BellFordVertex tempVertex = new BellFordVertex(sw, 0, null);
-		}
-
-		
-		// for all hosts, find a shortest path
-		for (BellFordVertex srcS w: switches) {
-
-			srcSw.setCost(0);
-			// set all other hosts cost to infinity
-			for (BellFordVertex dstSw: switches) {
-				dstSw.setCost(INFINITY);
-			}
-			
-			// relax the weights
-			for (int i = 2; i < switches.size(); i++) {
-				
-				// go through all links and recalculate costs to each destination from u
-				for (BellFordVertex u: switches) {
-					for (int port: u.getSwitch().getEnabledPortNumbers()) {
-						for (Link link: this.getLinks()) {
-							if (link.getSrc() == port) {
-								
-								for (BellFordVertex v: switches) {
-									if (v.getSwitch().getEnabledPortNumbers().contains(link.getDst())) {
-										
-										if (u.getCost() > v.getCost() + 1) {
-											u.setCost(v.getCost() + 1);
-											u.setNextHop(v.getSwitch());
-											u.setOutPort(port);
-										}
-										
-									}
-								}
-								
-							}
-						}
-					}
-					
-				}
-				
-			}
-			
-			// one iteration for srcSw is complete update these next hops into their 
-			// respective tables
-			for (BellFordVertex dstSw: switches) {
-				OFInstructionApplyActions instructions = new OFInstructionApplyActions();
-				
-				// create a new action with appropriate outgoing port
-				OFActionOutput action = new OFActionOutput();
-				action.setPort(dstSw.getOutPort());
-				
-				// add action to the list of instructions
-				List<OFAction> actionList = new ArrayList<OFAction>();
-				actionList.add(action);
-				instructions.setActions(actionList);
-				
-				// Construct IP packet
-				OFMatch match = new OFMatch();
-				//match.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, srcSw.getSwitch().get);
-				// TODO: const
-			}
-
-			
-		}
+	// TODO: redo all hosts
 		
 	}
 	
@@ -546,10 +479,6 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			}
 
 		}
-
-			
-
-		
 	}
 	
 }
