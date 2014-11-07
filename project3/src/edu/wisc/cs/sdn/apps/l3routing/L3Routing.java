@@ -546,9 +546,6 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 							// Construct IP packet
 							OFMatch matchCriteria = new OFMatch();
 							
-							// TODO
-							// When the mininet is started, for any reason the getIPv4Address is returning null.
-							
 							matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, host.getIPv4Address());
 							
 							/*************************************************8**********
