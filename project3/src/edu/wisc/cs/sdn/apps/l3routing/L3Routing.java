@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMatchField;
@@ -275,12 +277,15 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				 * TODO: how do we know whether the switch has gone up or down?
 				 * 
 				 ************************************************************/
-				/**
-				 *  Perhaps when a switch has gone down or up the methods switchAdded or switchRemoved are called. 
-				 *  However, if there is only one link to reach a switch and it is broken, I don't know if the
-				 *  switchRemoved is called (actually, who informs our application about a switch which was removed? Another switch).
-				 *  
-				 **/
+				
+				/***********************************************************
+				 * 
+				 * I think in this point we don't need to worry about that. I suppose when a switch go up or down the methods switchAdded and
+				 * switchRemoved are called. 
+				 * 
+				 * About this method, I think we need only to call the Bellman-ford algorithm to recalculate the paths.
+				 * 
+				 ************************************************************/
 				
 				
 				
@@ -297,6 +302,18 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				 * TODO: how do we know whether the switch has gone up or down?
 				 * 
 				 ************************************************************/
+				
+				/***********************************************************
+				 * 
+				 * I think in this point we don't need to worry about that. I suppose when a switch go up or down the methods switchAdded and
+				 * switchRemoved are called. 
+				 * 
+				 * About this method, I think we need only to call the Bellman-ford algorithm to recalculate the paths.
+				 * 
+				 ************************************************************/
+				
+				
+				
 				for (Link link: this.getLinks()) {
 					if (link.getDstPort() == update.getSrc() && link.getSrcPort() == update.getDst()) {
 						// remove link from link list
@@ -441,7 +458,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	private void bellmanFord() {
 		
 		// initially, add all switches to a switch list
-		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
+		List<BellFordVertex> switches = new  CopyOnWriteArrayList<BellFordVertex>();
 		
 		// initialize switch nodes
 		for (IOFSwitch sw : this.getSwitches().values()) {
@@ -453,7 +470,11 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		// find and store the neighbors for each node
 		establishNeighbors(switches);
 		
-		for (BellFordVertex src: switches) {
+		Iterator<BellFordVertex> bfvIterator = switches.iterator();
+		
+		while (bfvIterator.hasNext()) {
+			
+			BellFordVertex src = (BellFordVertex) bfvIterator.next();
 		
 			IOFSwitch srcSw = src.getSwitch();
 			
