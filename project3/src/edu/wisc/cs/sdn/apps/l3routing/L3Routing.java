@@ -174,6 +174,11 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				host.getName()));
 		
 		removeHost(host);
+		
+		
+		// TODO
+		// Should the paths be recalculated here?
+		
 	}
 
 	/**
@@ -270,6 +275,15 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				 * TODO: how do we know whether the switch has gone up or down?
 				 * 
 				 ************************************************************/
+				/**
+				 *  Perhaps when a switch has gone down or up the methods switchAdded or switchRemoved are called. 
+				 *  However, if there is only one link to reach a switch and it is broken, I don't know if the
+				 *  switchRemoved is called (actually, who informs our application about a switch which was removed? Another switch).
+				 *  
+				 **/
+				
+				
+				
 			}
 			
 			// Otherwise, the link is between two switches. Remove the link
@@ -498,6 +512,8 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 							actionList.add(action);
 							instructions.setActions(actionList);
 							
+							
+							
 							// Construct IP packet
 							OFMatch matchCriteria = new OFMatch();
 							matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, host.getIPv4Address());
@@ -507,8 +523,17 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 							 * List<OFInstruction from the actionList?
 							 * 
 							 ************************************************************/
-							SwitchCommands.installRule(dstSw.getSwitch(), dstSw.getSwitch().getTables(), (short) 1,
-						            matchCriteria, (List<OFInstruction>) instructions, (short) 0, (short) 0);
+							
+							/**
+							 * 
+							 * I think in this way:
+							 */
+							
+							List<OFInstruction> instructionList = new ArrayList<OFInstruction>();
+							instructionList.add(instructions); // Polymorphism (OFInstructionApplyActions is subclass of OFInstruction).
+							
+							SwitchCommands.installRule(dstSw.getSwitch(), dstSw.getSwitch().getTables(), SwitchCommands.DEFAULT_PRIORITY,
+						            matchCriteria, instructionList);
 							
 						}
 						
@@ -586,8 +611,6 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				actionList.add(action);
 				instructions.setActions(actionList);
 				
-				
-				List<OFInstruction>  instr;
 
 				// Construct IP packet
 				OFMatch matchCriteria = new OFMatch();
@@ -598,8 +621,17 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				 * List<OFInstruction from the actionList?
 				 * 
 				 ************************************************************/
-				SwitchCommands.installRule(dstSw.getSwitch(), dstSw.getSwitch().getTables(), (short) 1,
-			            matchCriteria, (List<OFInstruction>) instructions, (short) 0, (short) 0);
+				
+				/**
+				 * 
+				 * I think in this way:
+				 */
+				
+				List<OFInstruction> instructionList = new ArrayList<OFInstruction>();
+				instructionList.add(instructions); // Polymorphism (OFInstructionApplyActions is subclass of OFInstruction).
+				
+				SwitchCommands.installRule(dstSw.getSwitch(), dstSw.getSwitch().getTables(), SwitchCommands.DEFAULT_PRIORITY,
+			            matchCriteria, instructionList);
 			
 			}
 
