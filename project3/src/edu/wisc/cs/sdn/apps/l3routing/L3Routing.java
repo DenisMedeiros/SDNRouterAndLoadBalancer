@@ -141,7 +141,11 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	{
 		Host host = new Host(device, this.floodlightProv);
 		
-		this.getHosts().add(host);
+		//this.getHosts().add(host); We cannot do that!
+		
+		if(host.getIPv4Address() != null) {
+			this.knownHosts.put(device, host); // Add only hosts with valid IP address.
+		}
 		
 		// We only care about a new host if we know its IP
 		if (host.getIPv4Address() != null)
@@ -326,10 +330,14 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			}
 		}
 		
+		// Why should we remove all hosts only because one link is down?
+		// TODO
+
+		
 		// clean out hosts and recalculate
-		for (Host host : this.getHosts()) {
-			removeHost(host);
-		}
+		//for (Host host : this.getHosts()) {
+		//	removeHost(host);
+		//}
 		
 		// recalculate for all hosts
 		bellmanFord();
@@ -533,10 +541,14 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 							actionList.add(action);
 							instructions.setActions(actionList);
 							
-							
+							System.out.println(host.getIPv4Address());
 							
 							// Construct IP packet
 							OFMatch matchCriteria = new OFMatch();
+							
+							// TODO
+							// When the mininet is started, for any reason the getIPv4Address is returning null.
+							
 							matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, host.getIPv4Address());
 							
 							/*************************************************8**********
