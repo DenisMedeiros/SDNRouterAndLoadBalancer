@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -40,112 +41,112 @@ import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.routing.Link;
 
 public class L3Routing implements IFloodlightModule, IOFSwitchListener, 
-		ILinkDiscoveryListener, IDeviceListener, IL3Routing
+ILinkDiscoveryListener, IDeviceListener, IL3Routing
 {
 	public static final String MODULE_NAME = L3Routing.class.getSimpleName();
-	
+
 	// Interface to the logging system
-    private static Logger log = LoggerFactory.getLogger(MODULE_NAME);
-    
-    // Interface to Floodlight core for interacting with connected switches
-    private IFloodlightProviderService floodlightProv;
+	private static Logger log = LoggerFactory.getLogger(MODULE_NAME);
 
-    // Interface to link discovery service
-    private ILinkDiscoveryService linkDiscProv;
+	// Interface to Floodlight core for interacting with connected switches
+	private IFloodlightProviderService floodlightProv;
 
-    // Interface to device manager service
-    private IDeviceService deviceProv;
-    
-    // Switch table in which rules should be installed
-    private byte table;
-    
-    // Map of hosts to devices
-    private Map<IDevice,Host> knownHosts;
-    
-    private int INFINITY = 100000000;
+	// Interface to link discovery service
+	private ILinkDiscoveryService linkDiscProv;
+
+	// Interface to device manager service
+	private IDeviceService deviceProv;
+
+	// Switch table in which rules should be installed
+	private byte table;
+
+	// Map of hosts to devices
+	private Map<IDevice,Host> knownHosts;
+
+	private int INFINITY = 100000000;
 	/**
-     * Loads dependencies and initializes data structures.
-     */
+	 * Loads dependencies and initializes data structures.
+	 */
 	@Override
 	public void init(FloodlightModuleContext context)
 			throws FloodlightModuleException 
-	{
+			{
 		log.info(String.format("Initializing %s...", MODULE_NAME));
 		Map<String,String> config = context.getConfigParams(this);
-        this.table = Byte.parseByte(config.get("table"));
-        
+		this.table = Byte.parseByte(config.get("table"));
+
 		this.floodlightProv = context.getServiceImpl(
 				IFloodlightProviderService.class);
-        this.linkDiscProv = context.getServiceImpl(ILinkDiscoveryService.class);
-        this.deviceProv = context.getServiceImpl(IDeviceService.class);
-        
-        this.knownHosts = new ConcurrentHashMap<IDevice,Host>();
-        
-        /*********************************************************************/
-        /* TODO: Initialize other class variables, if necessary              */
-        
-        /*********************************************************************/
-	}
+		this.linkDiscProv = context.getServiceImpl(ILinkDiscoveryService.class);
+		this.deviceProv = context.getServiceImpl(IDeviceService.class);
+
+		this.knownHosts = new ConcurrentHashMap<IDevice,Host>();
+
+		/*********************************************************************/
+		/* TODO: Initialize other class variables, if necessary              */
+
+		/*********************************************************************/
+			}
 
 	/**
-     * Subscribes to events and performs other startup tasks.
-     */
+	 * Subscribes to events and performs other startup tasks.
+	 */
 	@Override
 	public void startUp(FloodlightModuleContext context)
 			throws FloodlightModuleException 
-	{
+			{
 		log.info(String.format("Starting %s...", MODULE_NAME));
 		this.floodlightProv.addOFSwitchListener(this);
 		this.linkDiscProv.addListener(this);
 		this.deviceProv.addListener(this);
-		
+
 		/*********************************************************************/
 		/* TODO: Perform other tasks, if necessary                           */
-		
+
 		/*********************************************************************/
-	}
-	
+			}
+
 	/**
 	 * Get the table in which this application installs rules.
 	 */
 	public byte getTable()
 	{ return this.table; }
-	
-    /**
-     * Get a list of all known hosts in the network.
-     */
-    private Collection<Host> getHosts()
-    { return this.knownHosts.values(); }
-	
-    /**
-     * Get a map of all active switches in the network. Switch DPID is used as
-     * the key.
-     */
-	private Map<Long, IOFSwitch> getSwitches()
-    { return floodlightProv.getAllSwitchMap(); }
-	
-    /**
-     * Get a list of all active links in the network.
-     */
-    private Collection<Link> getLinks()
-    { return linkDiscProv.getLinks().keySet(); }
 
-    /**
-     * Event handler called when a host joins the network.
-     * @param device information about the host
-     */
+	/**
+	 * Get a list of all known hosts in the network.
+	 */
+	private Collection<Host> getHosts()
+	{ return this.knownHosts.values(); }
+
+	/**
+	 * Get a map of all active switches in the network. Switch DPID is used as
+	 * the key.
+	 */
+	private Map<Long, IOFSwitch> getSwitches()
+	{ return floodlightProv.getAllSwitchMap(); }
+
+	/**
+	 * Get a list of all active links in the network.
+	 */
+	private Collection<Link> getLinks()
+	{ return linkDiscProv.getLinks().keySet(); }
+
+	/**
+	 * Event handler called when a host joins the network.
+	 * @param device information about the host
+	 */
 	@Override
 	public void deviceAdded(IDevice device) 
 	{
 
 		Host host = new Host(device, this.floodlightProv);
-		
+
 		//this.getHosts().add(host); We cannot do that!
-		
+
 		if(host.getIPv4Address() != null) {
 			this.knownHosts.put(device, host); // Add only hosts with valid IP address.
 		}
-		
+
 		// We only care about a new host if we know its IP
 		if (host.getIPv4Address() != null)
 		{
@@ -158,38 +159,38 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	}
 
 	/**
-     * Event handler called when a host is no longer attached to a switch.
-     * @param device information about the host
-     */
+	 * Event handler called when a host is no longer attached to a switch.
+	 * @param device information about the host
+	 */
 	@Override
 	public void deviceRemoved(IDevice device) 
 	{
 		Host host = this.knownHosts.get(device);
-		
+
 		// remove device
 		this.getHosts().remove(host);
-		
+
 		if (null == host)
 		{
 			host = new Host(device, this.floodlightProv);
 			this.knownHosts.put(device, host);
 		}
-		
+
 		log.info(String.format("Host %s is no longer attached to a switch", 
 				host.getName()));
-		
+
 		removeHost(host);
-		
-		
+
+
 		// TODO
 		// Should the paths be recalculated here?
-		
+
 	}
 
 	/**
-     * Event handler called when a host moves within the network.
-     * @param device information about the host
-     */
+	 * Event handler called when a host moves within the network.
+	 * @param device information about the host
+	 */
 	@Override
 	public void deviceMoved(IDevice device) 
 	{
@@ -199,7 +200,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			host = new Host(device, this.floodlightProv);
 			this.knownHosts.put(device, host);
 		}
-		
+
 		if (!host.isAttachedToSwitch())
 		{
 			this.deviceRemoved(device);
@@ -207,35 +208,35 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 		}
 		log.info(String.format("Host %s moved to s%d:%d", host.getName(),
 				host.getSwitch().getId(), host.getPort()));
-		
+
 		// remove host from all tables
 		removeHost(host);
-		
+
 		// redo for this host
 		bellmanFord(host);
 	}
-	
-    /**
-     * Event handler called when a switch joins the network.
-     * @param DPID for the switch
-     */
+
+	/**
+	 * Event handler called when a switch joins the network.
+	 * @param DPID for the switch
+	 */
 	@Override		
 	public void switchAdded(long switchId) 
 	{
-		
+
 		IOFSwitch sw = this.floodlightProv.getSwitch(switchId);
 		log.info(String.format("Switch s%d added", switchId));
-		
+
 		System.out.println("Switch was added!");
-		
+
 		// remove switch from list 
 		this.getSwitches().put(sw.getId(), sw);
-		
+
 		// remove information of all hosts from tables
 		for (Host host : this.getHosts()) {
 			removeHost(host);
 		}
-		
+
 		// recalculate for all hosts
 		bellmanFord();
 	}
@@ -248,17 +249,17 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	public void switchRemoved(long switchId) 
 	{
 		IOFSwitch sw = this.floodlightProv.getSwitch(switchId);
-		
+
 		log.info(String.format("Switch s%d removed", switchId));
-		
+
 		// remove switch from list 
 		this.getSwitches().remove(sw);
-		
+
 		// remove information of all hosts from tables
 		for (Host host : this.getHosts()) {
 			removeHost(host);
 		}
-		
+
 		// recalculate for all hosts
 		bellmanFord();
 	}
@@ -277,13 +278,13 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 			if (0 == update.getDst())
 			{
 				log.info(String.format("Link s%s:%d -> host updated", 
-					update.getSrc(), update.getSrcPort()));
+						update.getSrc(), update.getSrcPort()));
 
 				/*************************************************8**********
 				 * TODO: how do we know whether the switch has gone up or down?
 				 * 
 				 ************************************************************/
-				
+
 				/***********************************************************
 				 * 
 				 * I think in this point we don't need to worry about that. I suppose when a switch go up or down the methods switchAdded and
@@ -292,23 +293,23 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				 * About this method, I think we need only to call the Bellman-ford algorithm to recalculate the paths.
 				 * 
 				 ************************************************************/
-				
-				
-				
+
+
+
 			}
-			
+
 			// Otherwise, the link is between two switches. Remove the link
 			else
 			{
 				log.info(String.format("Link s%s:%d -> %s:%d updated", 
-					update.getSrc(), update.getSrcPort(),
-					update.getDst(), update.getDstPort()));
-				
+						update.getSrc(), update.getSrcPort(),
+						update.getDst(), update.getDstPort()));
+
 				/*************************************************8**********
 				 * TODO: how do we know whether the switch has gone up or down?
 				 * 
 				 ************************************************************/
-				
+
 				/***********************************************************
 				 * 
 				 * I think in this point we don't need to worry about that. I suppose when a switch go up or down the methods switchAdded and
@@ -317,34 +318,34 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				 * About this method, I think we need only to call the Bellman-ford algorithm to recalculate the paths.
 				 * 
 				 ************************************************************/
-				
-				
-				
+
+
+
 				for (Link link: this.getLinks()) {
 					if (link.getDstPort() == update.getSrc() && link.getSrcPort() == update.getDst()) {
 						// remove link from link list
 						this.getLinks().remove(link);
 						break;
-						
+
 					}
 				}
-				
+
 			}
 		}
-		
+
 		// Why should we remove all hosts only because one link is down?
 		// TODO
 
-		
+
 		// clean out hosts and recalculate
 		//for (Host host : this.getHosts()) {
 		//	removeHost(host);
 		//}
-		
+
 		// recalculate for all hosts
 		bellmanFord();
-		
-		
+
+
 	}
 
 	/**
@@ -354,23 +355,23 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	@Override
 	public void linkDiscoveryUpdate(LDUpdate update) 
 	{ this.linkDiscoveryUpdate(Arrays.asList(update)); }
-	
+
 	/**
-     * Event handler called when the IP address of a host changes.
-     * @param device information about the host
-     */
+	 * Event handler called when the IP address of a host changes.
+	 * @param device information about the host
+	 */
 	@Override
 	public void deviceIPV4AddrChanged(IDevice device) 
 	{ this.deviceAdded(device); }
 
 	/**
-     * Event handler called when the VLAN of a host changes.
-     * @param device information about the host
-     */
+	 * Event handler called when the VLAN of a host changes.
+	 * @param device information about the host
+	 */
 	@Override
 	public void deviceVlanChanged(IDevice device) 
 	{ /* Nothing we need to do, since we're not using VLANs */ }
-	
+
 	/**
 	 * Event handler called when the controller becomes the master for a switch.
 	 * @param DPID for the switch
@@ -386,7 +387,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	@Override
 	public void switchChanged(long switchId) 
 	{ /* Nothing we need to do */ }
-	
+
 	/**
 	 * Event handler called when a port on a switch goes up or down, or is
 	 * added or removed.
@@ -422,73 +423,75 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	@Override
 	public boolean isCallbackOrderingPostreq(String type, String name) 
 	{ return false; }
-	
-    /**
-     * Tell the module system which services we provide.
-     */
+
+	/**
+	 * Tell the module system which services we provide.
+	 */
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() 
 	{
 		Collection<Class<? extends IFloodlightService>> services =
-					new ArrayList<Class<? extends IFloodlightService>>();
+				new ArrayList<Class<? extends IFloodlightService>>();
 		services.add(IL3Routing.class);
 		return services; 
 	}
 
 	/**
-     * Tell the module system which services we implement.
-     */
+	 * Tell the module system which services we implement.
+	 */
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService> 
-			getServiceImpls() 
+	getServiceImpls() 
 	{ 
-        Map<Class<? extends IFloodlightService>, IFloodlightService> services =
-        			new HashMap<Class<? extends IFloodlightService>, 
-        					IFloodlightService>();
-        // We are the class that implements the service
-        services.put(IL3Routing.class, this);
-        return services;
+		Map<Class<? extends IFloodlightService>, IFloodlightService> services =
+				new HashMap<Class<? extends IFloodlightService>, 
+				IFloodlightService>();
+		// We are the class that implements the service
+		services.put(IL3Routing.class, this);
+		return services;
 	}
 
 	/**
-     * Tell the module system which modules we depend on.
-     */
+	 * Tell the module system which modules we depend on.
+	 */
 	@Override
 	public Collection<Class<? extends IFloodlightService>> 
-			getModuleDependencies() 
+	getModuleDependencies() 
 	{
 		Collection<Class<? extends IFloodlightService >> modules =
-	            new ArrayList<Class<? extends IFloodlightService>>();
+				new ArrayList<Class<? extends IFloodlightService>>();
 		modules.add(IFloodlightProviderService.class);
 		modules.add(ILinkDiscoveryService.class);
 		modules.add(IDeviceService.class);
-        return modules;
+		return modules;
 	}
-	
+
 	private void bellmanFord() {
-		
+
 		// initially, add all switches to a switch list
 		List<BellFordVertex> switches = new  CopyOnWriteArrayList<BellFordVertex>();
-		
+
 		// initialize switch nodes
 		for (IOFSwitch sw : this.getSwitches().values()) {
 			BellFordVertex tempVertex = new BellFordVertex();
 			tempVertex = new BellFordVertex(sw, INFINITY);
 			switches.add(tempVertex);
 		}
-		
+
 		// find and store the neighbors for each node
+		// This list can be null empty if there is only one switch in the network.
+
 		establishNeighbors(switches);
-		
+
 		Iterator<BellFordVertex> bfvIterator = switches.iterator();
-		
+
 		while (bfvIterator.hasNext()) {
-			
+
 			BellFordVertex src = (BellFordVertex) bfvIterator.next();
-		
+
 			IOFSwitch srcSw = src.getSwitch();
-			
-			
+
+
 			// re-establish weights for each iteration
 			for (IOFSwitch sw : this.getSwitches().values()) {
 				BellFordVertex tempVertex = new BellFordVertex();
@@ -498,218 +501,262 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 					tempVertex = new BellFordVertex(sw, INFINITY);
 				switches.add(tempVertex);
 			}
-			
+
 			// relax the weights
 			for (int i = 2; i < switches.size(); i++) {
-				
+
 				// go through all links and recalculate costs to each destination from u
 				for (BellFordVertex u: switches) {
-					
+
 					// for each port for a given switch u, compare the weight of
 					// u to all of its neighbors. If there is a neighbor that 
 					// has a less expensive path, go through that neighbor
 					for (int port: u.getSwitch().getEnabledPortNumbers()) {
-					
+
 						BellFordVertex neighbor = u.getNeighbors().get(port);
 						if (u.getCost() > neighbor.getCost() + 1) {
 							u.setCost(neighbor.getCost() + 1);
 							u.setOutPort(port);
 						}
-						
+
 					}
-					
+
 				}
-				
+
 			}
-			
+
 			// iterate through all the hosts of the current switch source 
 			//and establish a new route to all other hosts
 			for (Host host: this.getHosts()) {
-				
+
 				if (host.getSwitch().equals(srcSw)) {
-					
+
 					for (BellFordVertex dstSw: switches) {
-						
+
 						if (!dstSw.equals(srcSw)) {
-							
+
 							OFInstructionApplyActions instructions = new OFInstructionApplyActions();
-							
+
 							// create a new action with appropriate outgoing port
 							OFActionOutput action = new OFActionOutput();
 							action.setPort(dstSw.getOutPort());
-							
+
 							// add action to the list of instructions
 							List<OFAction> actionList = new ArrayList<OFAction>();
 							actionList.add(action);
 							instructions.setActions(actionList);
-							
+
 							System.out.println(host.getIPv4Address());
-							
+
 							// Construct IP packet
-							
+
 							OFMatch matchCriteria = new OFMatch();
-							
+
 							matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 							matchCriteria.setNetworkDestination(host.getIPv4Address());
-							
+
 							/*************************************************8**********
 							 * TODO: I don't think this is right. How do we get a 
 							 * List<OFInstruction from the actionList?
 							 * 
 							 ************************************************************/
-							
+
 							/**
 							 * 
 							 * I think in this way:
 							 */
-							
-							List<OFInstruction> instructionList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-							
-							SwitchCommands.installRule(dstSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
-						            matchCriteria, instructionList);
-							
-						}
-						
 
-			
+							List<OFInstruction> instructionList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+							SwitchCommands.installRule(dstSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
+									matchCriteria, instructionList);
+
+						}
+
+
+
 					}
-					
-				
+
+
 				}
 			}
-		
+
 		}
-		
+
 	}
-	
-	private void bellmanFord(Host srcHost) {
-		
-		// initially, add all switches to a switch list
+
+	private void bellmanFord(Host dstHost) {
+
+		// Initially, add all switches to a switch list.
 		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
-		IOFSwitch srcSw = srcHost.getSwitch();
-		
-		// initially set all costs to infinity, except for the source
-		// which is set to 0
+
+		// This is the switch that the host is plugged.
+		IOFSwitch dstSw = dstHost.getSwitch();
+
+		// Set all costs to infinity, except for the source which is set to 0.
+
 		for (IOFSwitch sw : this.getSwitches().values()) {
 			BellFordVertex tempVertex = new BellFordVertex();
-			if (sw.equals(srcSw))
+			if (sw.equals(dstSw)) {
 				tempVertex = new BellFordVertex(sw, 0);
-			else
+			}else{
 				tempVertex = new BellFordVertex(sw, INFINITY);
+			}
 			switches.add(tempVertex);
 		}
-		
-		// find and store the neighbors for each node
-		establishNeighbors(switches);
-		
-		// relax the weights
-		for (int i = 2; i < switches.size(); i++) {
+
+		// Relax the weights. 
+
+		for (int i = 1; i < switches.size() - 1 ; i++) {
 			
-			// go through all links and recalculate costs to each destination from u
-			for (BellFordVertex u: switches) {
-				
-				// for each port for a given switch u, compare the weight of
-				// u to all of its neighbors. If there is a neighbor that 
-				// has a less expensive path, go through that neighbor
-				for (int port: u.getSwitch().getEnabledPortNumbers()) {
-				
-					BellFordVertex neighbor = u.getNeighbors().get(port);
-					if (u.getCost() > neighbor.getCost() + 1) {
-						u.setCost(neighbor.getCost() + 1);
-						u.setOutPort(port);
+			Map<Long, Set<Link>> mapLinkSwitch = linkDiscProv.getSwitchLinks();
+
+			Iterator<BellFordVertex> iteratorVertexU = switches.iterator();
+
+			while(iteratorVertexU.hasNext()) {
+
+				BellFordVertex vertexU = (BellFordVertex)iteratorVertexU.next();
+
+				Set<Link> linksU = mapLinkSwitch.get(vertexU.getSwitch().getId());
+
+				Iterator<Link> iteratorLinksU = linksU.iterator();
+
+				while(iteratorLinksU.hasNext()) {
+
+					Link linkFromU = (Link)iteratorLinksU.next();
+
+					Iterator<BellFordVertex> iteratorVertexV = switches.iterator();
+
+					while(iteratorVertexV.hasNext()) {
+
+						BellFordVertex vertexV = (BellFordVertex)iteratorVertexV.next();
+
+						Set<Link> linksV = mapLinkSwitch.get(vertexV.getSwitch().getId());
+
+						Iterator<Link> iteratorLinksV = linksV.iterator();
+
+						while(iteratorLinksV.hasNext()) {
+
+							Link linkFromV = (Link)iteratorLinksV.next();
+
+							if(linkFromU.getDst() == linkFromV.getSrc()) {
+
+								if (vertexU.getCost() + 1 < vertexV.getCost()) {
+									vertexU.setOutPort(linkFromU.getSrcPort());
+									vertexV.setCost(vertexU.getCost() + 1);
+								}
+
+							}
+
+						}
+
 					}
-					
+
 				}
-				
 			}
-			
 		}
-		
-		// one iteration for srcSw is complete update these next hops into their 
-		// respective tables
-		
-		for (BellFordVertex dstSw: switches) {
+
+		// Installing the rules based on the previous result.	
+
+		for (BellFordVertex srcSw: switches) {
 			
-			if (!dstSw.equals(srcSw)) {
+			OFActionOutput action;
+			List<OFAction> actionList;
+			OFInstructionApplyActions instructions;
+			OFMatch matchCriteria;
+			List<OFInstruction> instructionsList;
+			
+			if (srcSw.getSwitch().equals(dstSw)) {
 				
-				OFInstructionApplyActions instructions = new OFInstructionApplyActions();
+				action = new OFActionOutput();
+				action.setPort(dstHost.getPort());
 				
-				// create a new action with appropriate outgoing port
-				OFActionOutput action = new OFActionOutput();
-				action.setPort(dstSw.getOutPort());
-				
-				// add action to the list of instructions
-				List<OFAction> actionList = new ArrayList<OFAction>();
+				actionList = new ArrayList<OFAction>();
 				actionList.add(action);
 				
+				instructions = new OFInstructionApplyActions();
 				instructions.setActions(actionList);
 				
+				matchCriteria = new OFMatch();
+
+				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+				
+				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+				
+				
+				SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+						matchCriteria, instructionsList);
+				
+				
+			} else {
+
+				
+
+				// create a new action with appropriate outgoing port
+				action = new OFActionOutput();
+				action.setPort(srcSw.getOutPort());
+
+				// add action to the list of instructions
+				actionList = new ArrayList<OFAction>();
+				actionList.add(action);
+				
+				instructions = new OFInstructionApplyActions();
+				instructions.setActions(actionList);
 
 				// Construct IP packet
-				OFMatch matchCriteria = new OFMatch();
-				
+				matchCriteria = new OFMatch();
+
 				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-				matchCriteria.setNetworkDestination(srcHost.getIPv4Address());
-				
-				
-				/*************************************************8**********
-				 * TODO: Again, I don't think this is right. How do we get a 
-				 * List<OFInstruction from the actionList?
-				 * 
-				 ************************************************************/
-				
-				/**
-				 * 
-				 * I think in this way:
-				 */	
-				
-				List<OFInstruction> instructionList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-				
-				SwitchCommands.installRule(dstSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
-			            matchCriteria, instructionList);
-			
+				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+
+				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+				SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
+						matchCriteria, instructionsList);
+
 			}
 
 		}
 	}
-	
+
 	private void removeHost(Host host) {
-		
+
 		// set up match information to be used for removal
 		OFMatch matchCriteria = new OFMatch();
 		matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, host.getIPv4Address());
-		
+
 		// remove host from all switches
 		for (IOFSwitch swtch: getSwitches().values()) {
-			
+
 			SwitchCommands.removeRules(swtch, this.table, matchCriteria);
-			
+
 		}
 	}
-	
+
 	private List<BellFordVertex> establishNeighbors(List<BellFordVertex> switches) {
-		
+
 		for (BellFordVertex u: switches) {
 			for (int port: u.getSwitch().getEnabledPortNumbers()) {
 				for (Link link: this.getLinks()) {
 					if (link.getSrc() == port) {
-						
+
 						for (BellFordVertex v: switches) {
 							if (v.getSwitch().getEnabledPortNumbers().contains(link.getDst())) {
-								
+
 								u.addNeighbor(port, u);
 								break;
 							}
 						}
-						
+
 					}
 				}
 			}
-			
+
 		}
-		
+
 		return switches;
-		
+
 	}
-	
+
 }
