@@ -7,19 +7,18 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+
 import org.openflow.protocol.OFMatch;
-import org.openflow.protocol.OFMatchField;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
 import org.openflow.protocol.instruction.OFInstruction;
 import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.sun.java.util.jar.pack.*;
 
 import edu.wisc.cs.sdn.apps.util.Host;
 import edu.wisc.cs.sdn.apps.util.SwitchCommands;
@@ -39,7 +38,6 @@ import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryListener;
 import net.floodlightcontroller.linkdiscovery.ILinkDiscoveryService;
 import net.floodlightcontroller.routing.Link;
-import net.floodlightcontroller.*;
 
 public class L3Routing implements IFloodlightModule, IOFSwitchListener, 
 		ILinkDiscoveryListener, IDeviceListener, IL3Routing
@@ -139,6 +137,7 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	@Override
 	public void deviceAdded(IDevice device) 
 	{
+
 		Host host = new Host(device, this.floodlightProv);
 		
 		//this.getHosts().add(host); We cannot do that!
@@ -223,8 +222,11 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	@Override		
 	public void switchAdded(long switchId) 
 	{
+		
 		IOFSwitch sw = this.floodlightProv.getSwitch(switchId);
 		log.info(String.format("Switch s%d added", switchId));
+		
+		System.out.println("Switch was added!");
 		
 		// remove switch from list 
 		this.getSwitches().put(sw.getId(), sw);
@@ -544,9 +546,11 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 							System.out.println(host.getIPv4Address());
 							
 							// Construct IP packet
+							
 							OFMatch matchCriteria = new OFMatch();
 							
-							matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, host.getIPv4Address());
+							matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+							matchCriteria.setNetworkDestination(host.getIPv4Address());
 							
 							/*************************************************8**********
 							 * TODO: I don't think this is right. How do we get a 
@@ -559,10 +563,9 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 							 * I think in this way:
 							 */
 							
-							List<OFInstruction> instructionList = new ArrayList<OFInstruction>();
-							instructionList.add(instructions); // Polymorphism (OFInstructionApplyActions is subclass of OFInstruction).
+							List<OFInstruction> instructionList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 							
-							SwitchCommands.installRule(dstSw.getSwitch(), dstSw.getSwitch().getTables(), SwitchCommands.DEFAULT_PRIORITY,
+							SwitchCommands.installRule(dstSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
 						            matchCriteria, instructionList);
 							
 						}
@@ -581,7 +584,6 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 	
 	private void bellmanFord(Host srcHost) {
 		
-
 		// initially, add all switches to a switch list
 		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
 		IOFSwitch srcSw = srcHost.getSwitch();
@@ -639,12 +641,16 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				// add action to the list of instructions
 				List<OFAction> actionList = new ArrayList<OFAction>();
 				actionList.add(action);
+				
 				instructions.setActions(actionList);
 				
 
 				// Construct IP packet
 				OFMatch matchCriteria = new OFMatch();
-				matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, srcHost.getIPv4Address());
+				
+				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+				matchCriteria.setNetworkDestination(srcHost.getIPv4Address());
+				
 				
 				/*************************************************8**********
 				 * TODO: Again, I don't think this is right. How do we get a 
@@ -655,12 +661,11 @@ public class L3Routing implements IFloodlightModule, IOFSwitchListener,
 				/**
 				 * 
 				 * I think in this way:
-				 */
+				 */	
 				
-				List<OFInstruction> instructionList = new ArrayList<OFInstruction>();
-				instructionList.add(instructions); // Polymorphism (OFInstructionApplyActions is subclass of OFInstruction).
+				List<OFInstruction> instructionList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 				
-				SwitchCommands.installRule(dstSw.getSwitch(), dstSw.getSwitch().getTables(), SwitchCommands.DEFAULT_PRIORITY,
+				SwitchCommands.installRule(dstSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
 			            matchCriteria, instructionList);
 			
 			}

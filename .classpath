@@ -3,5 +3,6 @@
 	<classpathentry kind="src" path="project3/src"/>
 	<classpathentry kind="lib" path="project3/FloodlightWithApps.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/floodlight"/>
 	<classpathentry kind="output" path="project3/bin"/>
 </classpath>
