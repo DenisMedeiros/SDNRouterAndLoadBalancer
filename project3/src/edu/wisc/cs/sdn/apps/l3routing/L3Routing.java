@@ -227,8 +227,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		IOFSwitch sw = this.floodlightProv.getSwitch(switchId);
 		log.info(String.format("Switch s%d added", switchId));
 
-		System.out.println("Switch was added!");
-
 		// remove switch from list 
 		this.getSwitches().put(sw.getId(), sw);
 
@@ -469,9 +467,9 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	private void bellmanFord() {
 
 		for(Host host : this.getHosts()) {
-			
+
 			bellmanFord(host);
-			
+
 		}
 
 	}
@@ -479,7 +477,9 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	private void bellmanFord(Host dstHost) {
 
 		// Initially, add all switches to a switch list.
-		List<BellFordVertex> switches = new ArrayList<BellFordVertex>();
+		Map<Long, BellFordVertex> switches = new HashMap<Long, BellFordVertex>();
+		Map<Long, Set<Link>> mapLinkSwitch = linkDiscProv.getSwitchLinks();
+		Map<Long, IOFSwitch> mapIdSwitch = this.getSwitches();
 
 		// This is the switch that the host is plugged.
 		IOFSwitch dstSw = dstHost.getSwitch();
@@ -489,26 +489,25 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		for (IOFSwitch sw : this.getSwitches().values()) {
 			BellFordVertex tempVertex = new BellFordVertex();
 			if (sw.equals(dstSw)) {
+				System.out.println("SW cost 0 " + sw);
 				tempVertex = new BellFordVertex(sw, 0);
 			}else{
+				System.out.println("SW cost INFINITY " + sw);
 				tempVertex = new BellFordVertex(sw, INFINITY);
 			}
-			switches.add(tempVertex);
+			switches.put(sw.getId(), tempVertex);
 		}
 
 		// Relax the weights. 
 
-		for (int i = 1; i < switches.size() - 1 ; i++) {
-			
-			// Get a map with all links and switches.
-			
-			Map<Long, Set<Link>> mapLinkSwitch = linkDiscProv.getSwitchLinks();
+		Iterator<BellFordVertex> iteratorVertexU = switches.values().iterator();
 
-			
-			Iterator<BellFordVertex> iteratorVertexU = switches.iterator();
-			
+		for (int i = 1; i < switches.size() - 1 ; i++) {
+
+			// Get a map with all links and switches.			
+
 			while(iteratorVertexU.hasNext()) {
-				
+
 				// Create the vertexU, which is the source in the graph, all get all its links.
 
 				BellFordVertex vertexU = (BellFordVertex)iteratorVertexU.next();
@@ -520,81 +519,80 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 					Link linkFromU = (Link)iteratorLinksU.next();
 
-					Iterator<BellFordVertex> iteratorVertexV = switches.iterator();
+					// Get all switches linked with the switch u.
 
-					while(iteratorVertexV.hasNext()) {
+					IOFSwitch otherSideSwitch = mapIdSwitch.get(linkFromU.getDst());
+					BellFordVertex vertexV = switches.get(otherSideSwitch.getId());
+
+					// Verify if this switch provides a best path.
+
+					if (vertexU.getCost() + 1 < vertexV.getCost()) {
+
+						System.out.println("Better cost detected!");
+						System.out.println("U " + vertexU.getSwitch());
+						System.out.println("V " + vertexV.getSwitch());
 						
-						// Create the vertexV, which is one neighbor in the graph, all get all its links.
+						System.out.println("Port " + linkFromU.getSrcPort());
+						System.out.println("New Cost" + (vertexU.getCost() + 1));
 
-						BellFordVertex vertexV = (BellFordVertex)iteratorVertexV.next();
-						Set<Link> linksV = mapLinkSwitch.get(vertexV.getSwitch().getId());
-
-						Iterator<Link> iteratorLinksV = linksV.iterator();
-
-						while(iteratorLinksV.hasNext()) {
-
-							Link linkFromV = (Link)iteratorLinksV.next();
-
-							if(linkFromU.compareTo(linkFromV) == 0) { // If the two switches are connected by this link.
-
-								// Verify if this switch provides a best path.
-								
-								if (vertexU.getCost() + 1 < vertexV.getCost()) {
-									vertexU.setOutPort(linkFromU.getSrcPort());
-									vertexV.setCost(vertexU.getCost() + 1);
-								}
-
-							}
-
-						}
-
+						vertexU.setOutPort(linkFromU.getSrcPort());
+						vertexV.setCost(vertexU.getCost() + 1);
 					}
 
 				}
+
 			}
+
 		}
+
+
 
 		// Installing the rules based on the previous result.	
 
-		for (BellFordVertex srcSw: switches) {
-			
+		for (BellFordVertex srcSw: switches.values()) {
+
+			System.out.println("Printing the costs!");
+			System.out.println("SRCSW " + srcSw.getSwitch());
+			System.out.println("COst " + srcSw.getCost());
+			System.out.println("Outport " + srcSw.getOutPort());
+
 			OFActionOutput action;
 			List<OFAction> actionList;
 			OFInstructionApplyActions instructions;
 			OFMatch matchCriteria;
 			List<OFInstruction> instructionsList;
-			
+
 			// If the switch is the final in the path, then redirect the packets to
 			// the port where the host is connected.
-			
+
 			if (srcSw.getSwitch().equals(dstSw)) {
-				
+
 				action = new OFActionOutput();
 				action.setPort(dstHost.getPort());
-				
+
 				actionList = new ArrayList<OFAction>();
 				actionList.add(action);
-				
+
 				instructions = new OFInstructionApplyActions();
 				instructions.setActions(actionList);
-				
+
 				matchCriteria = new OFMatch();
 
 				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
-				
+
 				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-				
-				
+
+
 				SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 						matchCriteria, instructionsList);
-				
-				
-			// If the switch is not the final in the path, then forward the packets to the next hop.	
-		
+
+
+				// If the switch is not the final in the path, then forward the packets to the next hop.	
+
 			} else {
 
-				
+
 
 				// create a new action with appropriate outgoing port
 				action = new OFActionOutput();
@@ -603,7 +601,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				// add action to the list of instructions
 				actionList = new ArrayList<OFAction>();
 				actionList.add(action);
-				
+
 				instructions = new OFInstructionApplyActions();
 				instructions.setActions(actionList);
 
