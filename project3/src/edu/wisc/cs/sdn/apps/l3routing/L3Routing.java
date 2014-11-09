@@ -587,7 +587,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 						matchCriteria, instructionsList);
 
-
+				log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch is connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+				
 				// If the switch is not the final in the path, then forward the packets to the next hop.	
 
 			} else {
@@ -615,6 +616,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 				SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
 						matchCriteria, instructionsList);
+				
+				log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch ISNOT connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
 
 			}
 
