@@ -468,119 +468,10 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 	private void bellmanFord() {
 
-		// initially, add all switches to a switch list
-		List<BellFordVertex> switches = new  CopyOnWriteArrayList<BellFordVertex>();
-
-		// initialize switch nodes
-		for (IOFSwitch sw : this.getSwitches().values()) {
-			BellFordVertex tempVertex = new BellFordVertex();
-			tempVertex = new BellFordVertex(sw, INFINITY);
-			switches.add(tempVertex);
-		}
-
-		// find and store the neighbors for each node
-		// This list can be null empty if there is only one switch in the network.
-
-		establishNeighbors(switches);
-
-		Iterator<BellFordVertex> bfvIterator = switches.iterator();
-
-		while (bfvIterator.hasNext()) {
-
-			BellFordVertex src = (BellFordVertex) bfvIterator.next();
-
-			IOFSwitch srcSw = src.getSwitch();
-
-
-			// re-establish weights for each iteration
-			for (IOFSwitch sw : this.getSwitches().values()) {
-				BellFordVertex tempVertex = new BellFordVertex();
-				if (sw.equals(srcSw))
-					tempVertex = new BellFordVertex(sw, 0);
-				else
-					tempVertex = new BellFordVertex(sw, INFINITY);
-				switches.add(tempVertex);
-			}
-
-			// relax the weights
-			for (int i = 2; i < switches.size(); i++) {
-
-				// go through all links and recalculate costs to each destination from u
-				for (BellFordVertex u: switches) {
-
-					// for each port for a given switch u, compare the weight of
-					// u to all of its neighbors. If there is a neighbor that 
-					// has a less expensive path, go through that neighbor
-					for (int port: u.getSwitch().getEnabledPortNumbers()) {
-
-						BellFordVertex neighbor = u.getNeighbors().get(port);
-						if (u.getCost() > neighbor.getCost() + 1) {
-							u.setCost(neighbor.getCost() + 1);
-							u.setOutPort(port);
-						}
-
-					}
-
-				}
-
-			}
-
-			// iterate through all the hosts of the current switch source 
-			//and establish a new route to all other hosts
-			for (Host host: this.getHosts()) {
-
-				if (host.getSwitch().equals(srcSw)) {
-
-					for (BellFordVertex dstSw: switches) {
-
-						if (!dstSw.equals(srcSw)) {
-
-							OFInstructionApplyActions instructions = new OFInstructionApplyActions();
-
-							// create a new action with appropriate outgoing port
-							OFActionOutput action = new OFActionOutput();
-							action.setPort(dstSw.getOutPort());
-
-							// add action to the list of instructions
-							List<OFAction> actionList = new ArrayList<OFAction>();
-							actionList.add(action);
-							instructions.setActions(actionList);
-
-							System.out.println(host.getIPv4Address());
-
-							// Construct IP packet
-
-							OFMatch matchCriteria = new OFMatch();
-
-							matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-							matchCriteria.setNetworkDestination(host.getIPv4Address());
-
-							/*************************************************8**********
-							 * TODO: I don't think this is right. How do we get a 
-							 * List<OFInstruction from the actionList?
-							 * 
-							 ************************************************************/
-
-							/**
-							 * 
-							 * I think in this way:
-							 */
-
-							List<OFInstruction> instructionList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-
-							SwitchCommands.installRule(dstSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
-									matchCriteria, instructionList);
-
-						}
-
-
-
-					}
-
-
-				}
-			}
-
+		for(Host host : this.getHosts()) {
+			
+			bellmanFord(host);
+			
 		}
 
 	}
@@ -609,14 +500,18 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		for (int i = 1; i < switches.size() - 1 ; i++) {
 			
+			// Get a map with all links and switches.
+			
 			Map<Long, Set<Link>> mapLinkSwitch = linkDiscProv.getSwitchLinks();
 
+			
 			Iterator<BellFordVertex> iteratorVertexU = switches.iterator();
-
+			
 			while(iteratorVertexU.hasNext()) {
+				
+				// Create the vertexU, which is the source in the graph, all get all its links.
 
 				BellFordVertex vertexU = (BellFordVertex)iteratorVertexU.next();
-
 				Set<Link> linksU = mapLinkSwitch.get(vertexU.getSwitch().getId());
 
 				Iterator<Link> iteratorLinksU = linksU.iterator();
@@ -628,9 +523,10 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 					Iterator<BellFordVertex> iteratorVertexV = switches.iterator();
 
 					while(iteratorVertexV.hasNext()) {
+						
+						// Create the vertexV, which is one neighbor in the graph, all get all its links.
 
 						BellFordVertex vertexV = (BellFordVertex)iteratorVertexV.next();
-
 						Set<Link> linksV = mapLinkSwitch.get(vertexV.getSwitch().getId());
 
 						Iterator<Link> iteratorLinksV = linksV.iterator();
@@ -639,8 +535,10 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 							Link linkFromV = (Link)iteratorLinksV.next();
 
-							if(linkFromU.getDst() == linkFromV.getSrc()) {
+							if(linkFromU.compareTo(linkFromV) == 0) { // If the two switches are connected by this link.
 
+								// Verify if this switch provides a best path.
+								
 								if (vertexU.getCost() + 1 < vertexV.getCost()) {
 									vertexU.setOutPort(linkFromU.getSrcPort());
 									vertexV.setCost(vertexU.getCost() + 1);
@@ -666,6 +564,9 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 			OFMatch matchCriteria;
 			List<OFInstruction> instructionsList;
 			
+			// If the switch is the final in the path, then redirect the packets to
+			// the port where the host is connected.
+			
 			if (srcSw.getSwitch().equals(dstSw)) {
 				
 				action = new OFActionOutput();
@@ -689,6 +590,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 						matchCriteria, instructionsList);
 				
 				
+			// If the switch is not the final in the path, then forward the packets to the next hop.	
+		
 			} else {
 
 				
@@ -724,39 +627,16 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		// set up match information to be used for removal
 		OFMatch matchCriteria = new OFMatch();
-		matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, host.getIPv4Address());
+		matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+		matchCriteria.setNetworkDestination(host.getIPv4Address());
 
 		// remove host from all switches
-		for (IOFSwitch swtch: getSwitches().values()) {
+		for (IOFSwitch swtch: this.getSwitches().values()) {
 
 			SwitchCommands.removeRules(swtch, this.table, matchCriteria);
 
 		}
 	}
 
-	private List<BellFordVertex> establishNeighbors(List<BellFordVertex> switches) {
-
-		for (BellFordVertex u: switches) {
-			for (int port: u.getSwitch().getEnabledPortNumbers()) {
-				for (Link link: this.getLinks()) {
-					if (link.getSrc() == port) {
-
-						for (BellFordVertex v: switches) {
-							if (v.getSwitch().getEnabledPortNumbers().contains(link.getDst())) {
-
-								u.addNeighbor(port, u);
-								break;
-							}
-						}
-
-					}
-				}
-			}
-
-		}
-
-		return switches;
-
-	}
 
 }
