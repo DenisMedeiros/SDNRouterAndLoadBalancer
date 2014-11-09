@@ -568,9 +568,15 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 							matchCriteria, instructionsList);
 
 
+<<<<<<< HEAD
 					// If the switch is not the final in the path, then forward the packets to the next hop.	
 
 				} else {
+=======
+				log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch is connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+				
+				// If the switch is not the final in the path, then forward the packets to the next hop.	
+>>>>>>> 7dc5b9c215d0c9675322960fad1cfa150056a0a1
 
 
 
@@ -596,7 +602,14 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 					SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
 							matchCriteria, instructionsList);
 
+<<<<<<< HEAD
 				}
+=======
+				SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
+						matchCriteria, instructionsList);
+				
+				log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch ISNOT connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+>>>>>>> 7dc5b9c215d0c9675322960fad1cfa150056a0a1
 
 			}
 		}
