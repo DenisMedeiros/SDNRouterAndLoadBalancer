@@ -7,10 +7,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 
 import org.openflow.protocol.OFMatch;
@@ -63,7 +61,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	// Map of hosts to devices
 	private Map<IDevice,Host> knownHosts;
 
-	private int INFINITY = 100000000;
+	private int INFINITY = 9999999;
 	/**
 	 * Loads dependencies and initializes data structures.
 	 */
@@ -494,10 +492,11 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 			switches.put(sw.getId(), tempVertex);
 		}
 
-
 		// Relax the weights. 
 
-		for (int i = 1; i < switches.size() - 1; i++) {
+		for (int i = 1; i < switches.size(); i++) {
+			
+			System.out.println("Iteration ########################### " + i);
 
 			ArrayList<Link> allLinks = new ArrayList<Link>(this.getLinks());
 
@@ -511,98 +510,109 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				BellFordVertex vertexV = switches.get(link.getDst());
 
 				System.out.println("U " + vertexU.getSwitch());
+				System.out.println("U COst " + vertexU.getCost());
+
 				System.out.println("V " + vertexV.getSwitch());
+				System.out.println("V COst " + vertexV.getCost());
+
+				System.out.println("New U + 1 " + vertexU.getCost() + 1);
 
 				if (vertexU.getCost() + 1 < vertexV.getCost()) {
 
+					vertexV.setOutPort(link.getDstPort());
+					vertexV.setCost(vertexU.getCost() + 1);
+					
 					System.out.println("Better cost detected!");
 
-					System.out.println("Port " + link.getSrcPort());
-					System.out.println("New Cost " + (vertexU.getCost() + 1));
-
-					vertexU.setOutPort(link.getSrcPort());
-					vertexV.setCost(vertexU.getCost() + 1);
+					System.out.println("Port of " + vertexV.getSwitch() + ": " + link.getDstPort());
+					System.out.println("New Cost of " + vertexV.getSwitch() + ": " + (vertexU.getCost() + 1));
+					
+					
 				}
 
 			}
 
-
-			// Installing the rules based on the previous result.	
-
-			for (BellFordVertex srcSw: switches.values()) {
-
-				System.out.println("Printing the costs!");
-				System.out.println("SRCSW " + srcSw.getSwitch());
-				System.out.println("COst " + srcSw.getCost());
-				System.out.println("Outport " + srcSw.getOutPort());
-
-				OFActionOutput action;
-				List<OFAction> actionList;
-				OFInstructionApplyActions instructions;
-				OFMatch matchCriteria;
-				List<OFInstruction> instructionsList;
-
-				// If the switch is the final in the path, then redirect the packets to
-				// the port where the host is connected.
-
-				if (srcSw.getSwitch().equals(dstSw)) {
-
-					action = new OFActionOutput();
-					action.setPort(dstHost.getPort());
-
-					actionList = new ArrayList<OFAction>();
-					actionList.add(action);
-
-					instructions = new OFInstructionApplyActions();
-					instructions.setActions(actionList);
-
-					matchCriteria = new OFMatch();
-
-					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-					matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
-
-					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+		}
 
 
-					SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
-							matchCriteria, instructionsList);
+		// Installing the rules based on the previous result.	
 
-					// If the switch is not the final in the path, then forward the packets to the next hop.	
+		for (BellFordVertex srcSw: switches.values()) {
 
-				} else {
+			System.out.println("Printing the costs!");
+			System.out.println("SRCSW " + srcSw.getSwitch());
+			System.out.println("COst " + srcSw.getCost());
+			System.out.println("Outport " + srcSw.getOutPort());
 
-					log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch is connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+			OFActionOutput action;
+			List<OFAction> actionList;
+			OFInstructionApplyActions instructions;
+			OFMatch matchCriteria;
+			List<OFInstruction> instructionsList;
 
-					// If the switch is not the final in the path, then forward the packets to the next hop.	
+			// If the switch is the final in the path, then redirect the packets to
+			// the port where the host is connected.
 
-					// create a new action with appropriate outgoing port
-					action = new OFActionOutput();
-					action.setPort(srcSw.getOutPort());
+			if (srcSw.getSwitch().equals(dstSw)) {
 
-					// add action to the list of instructions
-					actionList = new ArrayList<OFAction>();
-					actionList.add(action);
+				action = new OFActionOutput();
+				action.setPort(dstHost.getPort());
 
-					instructions = new OFInstructionApplyActions();
-					instructions.setActions(actionList);
+				actionList = new ArrayList<OFAction>();
+				actionList.add(action);
 
-					// Construct IP packet
-					matchCriteria = new OFMatch();
+				instructions = new OFInstructionApplyActions();
+				instructions.setActions(actionList);
 
-					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-					matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+				matchCriteria = new OFMatch();
 
-					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
 
-					SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
-							matchCriteria, instructionsList);
+				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 
 
-					log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch ISNOT connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+				SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+						matchCriteria, instructionsList);
 
-				}
+				// If the switch is not the final in the path, then forward the packets to the next hop.	
+				
+				log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch is connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+
+			} else {
+
+
+
+				// If the switch is not the final in the path, then forward the packets to the next hop.	
+
+				// create a new action with appropriate outgoing port
+				action = new OFActionOutput();
+				action.setPort(srcSw.getOutPort());
+
+				// add action to the list of instructions
+				actionList = new ArrayList<OFAction>();
+				actionList.add(action);
+
+				instructions = new OFInstructionApplyActions();
+				instructions.setActions(actionList);
+
+				// Construct IP packet
+				matchCriteria = new OFMatch();
+
+				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+
+				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+				SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
+						matchCriteria, instructionsList);
+
+
+				log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch ISNOT connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
+
 			}
 		}
+
 	}
 
 	private void removeHost(Host host) {
