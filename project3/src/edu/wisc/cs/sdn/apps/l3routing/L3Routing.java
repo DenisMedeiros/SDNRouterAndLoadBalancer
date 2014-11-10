@@ -267,30 +267,17 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	@Override
 	public void linkDiscoveryUpdate(List<LDUpdate> updateList) 
 	{
+		
+
+
 		for (LDUpdate update : updateList)
 		{
 			// If we only know the switch & port for one end of the link, then
 			// the link must be from a switch to a host
-			if (0 == update.getDst())
+			if (0 == update.getDst() || 0 == update.getSrc())
 			{
 				log.info(String.format("Link s%s:%d -> host updated", 
 						update.getSrc(), update.getSrcPort()));
-
-				/*************************************************8**********
-				 * TODO: how do we know whether the switch has gone up or down?
-				 * 
-				 ************************************************************/
-
-				/***********************************************************
-				 * 
-				 * I think in this point we don't need to worry about that. I suppose when a switch go up or down the methods switchAdded and
-				 * switchRemoved are called. 
-				 * 
-				 * About this method, I think we need only to call the Bellman-ford algorithm to recalculate the paths.
-				 * 
-				 ************************************************************/
-
-
 
 			}
 
@@ -300,22 +287,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				log.info(String.format("Link s%s:%d -> %s:%d updated", 
 						update.getSrc(), update.getSrcPort(),
 						update.getDst(), update.getDstPort()));
-
-				/*************************************************8**********
-				 * TODO: how do we know whether the switch has gone up or down?
-				 * 
-				 ************************************************************/
-
-				/***********************************************************
-				 * 
-				 * I think in this point we don't need to worry about that. I suppose when a switch go up or down the methods switchAdded and
-				 * switchRemoved are called. 
-				 * 
-				 * About this method, I think we need only to call the Bellman-ford algorithm to recalculate the paths.
-				 * 
-				 ************************************************************/
-
-
 
 				for (Link link: this.getLinks()) {
 					if (link.getDstPort() == update.getSrc() && link.getSrcPort() == update.getDst()) {
@@ -329,14 +300,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 			}
 		}
 
-		// Why should we remove all hosts only because one link is down?
-		// TODO
-
-
-		// clean out hosts and recalculate
-		//for (Host host : this.getHosts()) {
-		//	removeHost(host);
-		//}
 
 		// recalculate for all hosts
 		bellmanFord();

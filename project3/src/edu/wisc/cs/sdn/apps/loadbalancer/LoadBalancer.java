@@ -1,5 +1,6 @@
 package edu.wisc.cs.sdn.apps.loadbalancer;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -29,7 +30,11 @@ import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.internal.DeviceManagerImpl;
+import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPv4;
+import net.floodlightcontroller.packet.TCP;
+import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.util.MACAddress;
 
 public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
@@ -166,6 +171,49 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		/*       reset; ignore all other packets                             */
 		
 		/*********************************************************************/
+			// Case 1: Arp Request
+		if (ethPkt.getEtherType() == Ethernet.TYPE_ARP) {
+			
+			ARP arpPacket = (ARP)ethPkt.getPayload();
+			
+			
+			// Check if arpPacket is a request
+			
+			if (arpPacket.getOpCode() == ARP.OP_REQUEST) {
+				// TODO: send ARP reply
+			}
+			
+			// Case 2: TCP, not a syn request
+			
+		} else if  (ethPkt.getEtherType() == Ethernet.TYPE_IPv4) {
+			
+			IPv4 ipPacket = null;
+			ipPacket = (IPv4)ethPkt.getPayload();
+			
+			// Check whether Packet is of type TCP
+			
+			if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
+				
+				TCP tcpPacket = (TCP) ipPacket.getPayload();
+				
+				short flags = tcpPacket.getFlags();
+				
+				boolean synBit = false;
+
+			    byte[] flagBytes = new byte[2];
+			    flagBytes[0] = (byte) (flags & 0x00FF);
+			    flagBytes[1] = (byte) (flags >> 8);
+				// TODO: get syn bit and check if 0. If so, send reset packet
+				
+				
+				
+				
+				
+			}
+		}
+		
+		
+		
 		
 		return Command.CONTINUE;
 	}
