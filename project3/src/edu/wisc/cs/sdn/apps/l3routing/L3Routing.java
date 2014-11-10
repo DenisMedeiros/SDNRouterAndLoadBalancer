@@ -494,9 +494,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		// Relax the weights. 
 
-		for (int i = 1; i < switches.size(); i++) {
+		for (int i = 1; i < switches.size(); i++) { // We need more one iterator instead of size - 1.
 			
-			System.out.println("Iteration ########################### " + i);
 
 			ArrayList<Link> allLinks = new ArrayList<Link>(this.getLinks());
 
@@ -509,23 +508,10 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				BellFordVertex vertexU = switches.get(link.getSrc());
 				BellFordVertex vertexV = switches.get(link.getDst());
 
-				System.out.println("U " + vertexU.getSwitch());
-				System.out.println("U COst " + vertexU.getCost());
-
-				System.out.println("V " + vertexV.getSwitch());
-				System.out.println("V COst " + vertexV.getCost());
-
-				System.out.println("New U + 1 " + vertexU.getCost() + 1);
-
 				if (vertexU.getCost() + 1 < vertexV.getCost()) {
 
 					vertexV.setOutPort(link.getDstPort());
 					vertexV.setCost(vertexU.getCost() + 1);
-					
-					System.out.println("Better cost detected!");
-
-					System.out.println("Port of " + vertexV.getSwitch() + ": " + link.getDstPort());
-					System.out.println("New Cost of " + vertexV.getSwitch() + ": " + (vertexU.getCost() + 1));
 					
 					
 				}
@@ -538,11 +524,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		// Installing the rules based on the previous result.	
 
 		for (BellFordVertex srcSw: switches.values()) {
-
-			System.out.println("Printing the costs!");
-			System.out.println("SRCSW " + srcSw.getSwitch());
-			System.out.println("COst " + srcSw.getCost());
-			System.out.println("Outport " + srcSw.getOutPort());
 
 			OFActionOutput action;
 			List<OFAction> actionList;
