@@ -525,8 +525,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 			} else {
 
-
-
 				// If the switch is not the final in the path, then forward the packets to the next hop.	
 
 				// create a new action with appropriate outgoing port

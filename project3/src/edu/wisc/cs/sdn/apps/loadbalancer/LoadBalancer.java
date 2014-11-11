@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import edu.wisc.cs.sdn.apps.l3routing.IL3Routing;
 import edu.wisc.cs.sdn.apps.util.ArpServer;
+import edu.wisc.cs.sdn.apps.util.SwitchCommands;
 
 import net.floodlightcontroller.core.FloodlightContext;
 import net.floodlightcontroller.core.IFloodlightProviderService;
@@ -41,6 +42,8 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		IOFMessageListener
 {
 	public static final String MODULE_NAME = LoadBalancer.class.getSimpleName();
+	
+	private static int roundRobin = 0 ;
 	
 	private static final byte TCP_FLAG_SYN = 0x02;
 	
@@ -139,7 +142,10 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		/*       (2) ARP packets to the controller, and                      */
 		/*       (3) all other packets to the next rule table in the switch  */
 		
+		
 		/*********************************************************************/
+		
+		
 	}
 	
 	/**
@@ -157,20 +163,12 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		if (msg.getType() != OFType.PACKET_IN)
 		{ return Command.CONTINUE; }
 		OFPacketIn pktIn = (OFPacketIn)msg;
-		
 		// Handle the packet
 		Ethernet ethPkt = new Ethernet();
 		ethPkt.deserialize(pktIn.getPacketData(), 0,
 				pktIn.getPacketData().length);
 		
-		/*********************************************************************/
-		/* TODO: Send an ARP reply for ARP requests for virtual IPs; for TCP */
-		/*       SYNs sent to a virtual IP, select a host and install        */
-		/*       connection-specific rules to rewrite IP and MAC addresses;  */
-		/*       for all other TCP packets sent to a virtual IP, send a TCP  */
-		/*       reset; ignore all other packets                             */
 		
-		/*********************************************************************/
 			// Case 1: Arp Request
 		if (ethPkt.getEtherType() == Ethernet.TYPE_ARP) {
 			
@@ -180,7 +178,35 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			// Check if arpPacket is a request
 			
 			if (arpPacket.getOpCode() == ARP.OP_REQUEST) {
-				// TODO: send ARP reply
+				
+				// send ARP reply 
+				
+				int virtualIP = IPv4.toIPv4Address(arpPacket.getTargetProtocolAddress());
+				byte[] virtualMAC = this.getHostMACAddress(virtualIP);
+				
+				if (virtualMAC == null) {
+					// TODO: error, mac not found
+				}
+				
+				// reconstruct ARP packet
+				
+				ARP arpReply = new ARP();
+				arpReply.setOpCode(ARP.OP_REPLY);
+				arpReply.setTargetHardwareAddress(arpPacket.getSenderHardwareAddress());
+				arpReply.setTargetProtocolAddress(arpPacket.getSenderProtocolAddress());
+				arpReply.setSenderHardwareAddress(virtualMAC);
+				arpReply.setSenderProtocolAddress(IPv4.toIPv4AddressBytes(virtualIP));
+				
+				
+				// reset ethernet fields for source and destination MAC addresses
+				
+				ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+				ethPkt.setSourceMACAddress(virtualMAC);
+				
+				
+				// send packet
+				
+				SwitchCommands.sendPacket(sw, (short) pktIn.getInPort(), ethPkt);
 			}
 			
 			// Case 2: TCP, not a syn request
@@ -200,13 +226,47 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 				
 				boolean synBit = false;
 
-			    byte[] flagBytes = new byte[2];
-			    flagBytes[0] = (byte) (flags & 0x00FF);
-			    flagBytes[1] = (byte) (flags >> 8);
-				// TODO: get syn bit and check if 0. If so, send reset packet
-				
-				
-				
+			    byte flagBytes = (byte) (flags >> 8);
+			    byte synByte = (byte) (flagBytes & this.TCP_FLAG_SYN);
+			    
+			    if (synByte != this.TCP_FLAG_SYN) {
+			    	
+			    	
+			    	// set reset Flags
+			    	
+			    	short resetFlags = (short)( ( (0x04)<<8) | ( ( (byte) flags)&0xFF) );
+			    	
+			    	
+			    	// reconstruct the TCP Packet
+			    	
+			    	tcpPacket.setFlags((short) resetFlags);
+			    	tcpPacket.setDestinationPort(tcpPacket.getSourcePort());
+			    	tcpPacket.setSourcePort((short) pktIn.getInPort());
+			    	
+			    	
+					// reset ethernet fields for source and destination MAC addresses
+			    	
+			    	ethPkt.setSourceMACAddress(ethPkt.getDestinationMACAddress());
+					ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+					
+					
+					// send packet
+					SwitchCommands.sendPacket(sw, (short) pktIn.getInPort(), ethPkt);
+					
+			    } else {
+			    	// TCP packet is of type SYN
+			    	
+			    	// choose next host to send to 
+			    	
+			    	int count = 0;
+			    	LoadBalancerInstance chosenHost;
+			    	while (count <= roundRobin) {
+			    		chosenHost = this.instances.values().iterator().next();
+			    		count++;
+			    	}
+			    	roundRobin++;
+			    	
+			    }
 				
 				
 			}
