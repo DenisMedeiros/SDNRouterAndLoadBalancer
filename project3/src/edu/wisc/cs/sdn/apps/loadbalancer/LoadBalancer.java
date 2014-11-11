@@ -266,6 +266,9 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			    	}
 			    	roundRobin++;
 			    	
+			    	// send to chosen host
+			    	
+			    	
 			    }
 				
 				
