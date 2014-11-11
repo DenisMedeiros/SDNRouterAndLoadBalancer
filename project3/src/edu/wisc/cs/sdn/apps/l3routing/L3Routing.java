@@ -273,7 +273,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		for (LDUpdate update : updateList)
 		{
-			update.
 			// If we only know the switch & port for one end of the link, then
 			// the link must be from a switch to a host
 			if (0 == update.getDst() || 0 == update.getSrc())
