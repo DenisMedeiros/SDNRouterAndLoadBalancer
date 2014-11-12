@@ -2,14 +2,23 @@ package edu.wisc.cs.sdn.apps.loadbalancer;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFPacketIn;
+import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
+import org.openflow.protocol.action.OFAction;
+import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
+import org.openflow.protocol.instruction.OFInstructionGotoTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,10 +150,86 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		/*       balancer IP to the controller                               */
 		/*       (2) ARP packets to the controller, and                      */
 		/*       (3) all other packets to the next rule table in the switch  */
-		
-		
 		/*********************************************************************/
 		
+		
+		// Installing the rules in the switch
+		
+		OFActionOutput action;
+		List<OFAction> actionList;
+		OFInstructionApplyActions instructions;
+		OFMatch matchCriteria;
+		List<OFInstruction> instructionsList;
+		
+		// If the packet is address to the virtual IP, send it to the controller.
+		
+		Iterator<LoadBalancerInstance> iteratorLoadBalancer = this.instances.values().iterator();
+		
+		while(iteratorLoadBalancer.hasNext()) { // Iterate over all instances (each has one virtual IP).
+			
+			LoadBalancerInstance loadBalancer = (LoadBalancerInstance)iteratorLoadBalancer.next();
+			
+			action = new OFActionOutput();
+			action.setPort(OFPort.OFPP_CONTROLLER);
+
+			actionList = new ArrayList<OFAction>();
+			actionList.add(action);
+			
+			instructions = new OFInstructionApplyActions();
+			instructions.setActions(actionList);
+			
+			
+			matchCriteria = new OFMatch();
+
+			matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+			matchCriteria.setNetworkDestination(loadBalancer.getVirtualIP()); 
+			
+			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+
+			SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+					matchCriteria, instructionsList);
+			
+	
+		}
+		
+		// If the packet is an ARP request, send it to the controller.
+		
+		
+		action = new OFActionOutput();
+		action.setPort(OFPort.OFPP_CONTROLLER);
+
+		actionList = new ArrayList<OFAction>();
+		actionList.add(action);
+		
+		instructions = new OFInstructionApplyActions();
+		instructions.setActions(actionList);
+		
+		
+		matchCriteria = new OFMatch();
+
+		matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_ARP);
+		
+		instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+
+		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+				matchCriteria, instructionsList);
+		
+
+		// Finally, other kind of packets should go to the level-3 routing table.
+
+		OFInstructionGotoTable goToTableInstructions = new OFInstructionGotoTable();
+		goToTableInstructions.setTableId(l3RoutingApp.getTable());
+		
+		
+		matchCriteria = new OFMatch(); // A blank match should work as a wildcard.
+		
+		instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+				matchCriteria, instructionsList);
+
 		
 	}
 	
