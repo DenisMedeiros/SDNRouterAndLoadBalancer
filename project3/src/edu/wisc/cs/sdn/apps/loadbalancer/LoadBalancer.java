@@ -2,14 +2,25 @@ package edu.wisc.cs.sdn.apps.loadbalancer;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
+import org.openflow.protocol.OFMatch;
 import org.openflow.protocol.OFMessage;
+import org.openflow.protocol.OFOXMField;
+import org.openflow.protocol.OFOXMFieldType;
 import org.openflow.protocol.OFPacketIn;
 import org.openflow.protocol.OFType;
+import org.openflow.protocol.action.OFAction;
+import org.openflow.protocol.action.OFActionOutput;
+import org.openflow.protocol.action.OFActionSetField;
+import org.openflow.protocol.action.OFActionType;
+import org.openflow.protocol.instruction.OFInstruction;
+import org.openflow.protocol.instruction.OFInstructionApplyActions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +57,8 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 	private static int roundRobin = 0 ;
 	
 	private static final byte TCP_FLAG_SYN = 0x02;
+	
+	private static final byte TCP_FLAG_RESET = 0x04;
 	
 	private static final short IDLE_TIMEOUT = 20;
 	
@@ -221,25 +234,12 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
 				
 				TCP tcpPacket = (TCP) ipPacket.getPayload();
-				
-				short flags = tcpPacket.getFlags();
-				
-				boolean synBit = false;
 
-			    byte flagBytes = (byte) (flags >> 8);
-			    byte synByte = (byte) (flagBytes & this.TCP_FLAG_SYN);
-			    
-			    if (synByte != this.TCP_FLAG_SYN) {
+			    if (tcpPacket.getFlags() == TCP_FLAG_SYN) {
 			    	
 			    	
 			    	// set reset Flags
-			    	
-			    	short resetFlags = (short)( ( (0x04)<<8) | ( ( (byte) flags)&0xFF) );
-			    	
-			    	
-			    	// reconstruct the TCP Packet
-			    	
-			    	tcpPacket.setFlags((short) resetFlags);
+			    	tcpPacket.setFlags((short) TCP_FLAG_RESET);
 			    	tcpPacket.setDestinationPort(tcpPacket.getSourcePort());
 			    	tcpPacket.setSourcePort((short) pktIn.getInPort());
 			    	
@@ -254,19 +254,113 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					SwitchCommands.sendPacket(sw, (short) pktIn.getInPort(), ethPkt);
 					
 			    } else {
-			    	// TCP packet is of type SYN
 			    	
-			    	// choose next host to send to 
+			    	// TCP packet is of type SYN, connection is initializing
 			    	
-			    	int count = 0;
-			    	LoadBalancerInstance chosenHost;
-			    	while (count <= roundRobin) {
-			    		chosenHost = this.instances.values().iterator().next();
-			    		count++;
-			    	}
-			    	roundRobin++;
+			    	// get the IP address of the current load balancer
 			    	
-			    	// send to chosen host
+			    	int virtualIP = ipPacket.getDestinationAddress();
+			    	
+			    	LoadBalancerInstance loadBalancer = this.instances.get(virtualIP);
+			    	
+			    	
+			    	// get host to return to client
+			    	
+			    	int hostIP = loadBalancer.getNextHostIP();
+			    	
+			    	
+			    	
+			    	/*
+			    	*	Install connection-specific rules for each new connection to a virtual IP to
+			    	*	Rewrite the destination IP and MAC address of TCP packets sent from a client to the virtual IP
+			    	*/
+			    	
+
+					OFInstructionApplyActions instructions = new OFInstructionApplyActions();
+					OFActionSetField MAC;
+					OFActionSetField IP;
+					OFActionType type;
+					
+					// set up action field for MAC destination
+					
+					OFOXMField fieldMAC;
+					fieldMAC.setValue(loadBalancer.getVirtualMAC());
+					MAC.setType(OFOXMFieldType.ETH_DST);
+					MAC.setField(fieldMAC);
+					
+					
+					// set up action field for IP destination
+					
+					OFOXMField fieldIP;
+					fieldIP.setValue(loadBalancer.getVirtualIP());
+					IP.setType(OFOXMFieldType.IPV4_DST);
+					IP.setField(fieldIP);
+					
+					// Set up match criteria for source address of client IP
+					
+					OFMatch matchCriteria = new OFMatch();
+					
+					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+					matchCriteria.setNetworkSource(ipPacket.getSourceAddress());
+					matchCriteria.setNetworkDestination(hostIP);
+					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+					matchCriteria.setNetworkProtocol(OFMatch.IP_PROTO_TCP);
+					
+					// TODO: SET MATCHCRITERIA TO READ SOURCE AND DESTINATION PORT. I COULD NOT FIGURE OUT HOW TO DO THIS
+					
+					
+					// set up action list of fields
+					List<OFAction> actionList = new ArrayList<OFAction>();
+					actionList.add(MAC);
+					actionList.add(IP);
+					instructions.setActions(actionList);
+					
+					List<OFInstruction> instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+					
+			    	SwitchCommands.installRule(sw, sw.getTables(), SwitchCommands.MAX_PRIORITY,
+			                matchCriteria, instructionsList, (short) 0, IDLE_TIMEOUT);
+			    	
+			    	
+			    	
+			    	
+			    	/* Set up a rule in the switch for packets from the
+			    	 *  server to the client */
+			    	
+					instructions = new OFInstructionApplyActions();
+
+					// set up action field for MAC destination
+					
+					fieldMAC.setValue(loadBalancer.getVirtualMAC());
+					MAC.setType(OFOXMFieldType.ETH_SRC);
+					MAC.setField(fieldMAC);
+					
+					// set up action field for IP destination
+
+					fieldIP.setValue(hostIP);
+					IP.setType(OFOXMFieldType.IPV4_SRC);
+					IP.setField(fieldIP);
+					
+					
+					// Set up match criteria for source address of client IP
+					
+					matchCriteria = new OFMatch();
+					
+					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+					matchCriteria.setNetworkSource(loadBalancer.getVirtualIP());
+					matchCriteria.setNetworkDestination(ipPacket.getSourceAddress());
+					
+					
+					// set up action list of fields
+					actionList = new ArrayList<OFAction>();
+					actionList.add(MAC);
+					actionList.add(IP);
+					instructions.setActions(actionList);
+					
+					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+					
+			    	SwitchCommands.installRule(sw, sw.getTables(), SwitchCommands.MAX_PRIORITY,
+			                matchCriteria, instructionsList, (short) 0, IDLE_TIMEOUT);
+
 			    	
 			    	
 			    }

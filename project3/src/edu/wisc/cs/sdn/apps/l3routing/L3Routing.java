@@ -502,13 +502,35 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				
 				// host not reachable. send ICMP message
 
-
 				matchCriteria = new OFMatch();
 				
 				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
 				
 				SwitchCommands.removeRules(srcSw.getSwitch(), this.table, matchCriteria);
+				
+				
+				// handle removed destination host
+				
+				action = new OFActionOutput();
+				action.setPort(OFPort.OFPP_IN_PORT);
+
+				actionList = new ArrayList<OFAction>();
+				actionList.add(action);
+
+				instructions = new OFInstructionApplyActions();
+				instructions.setActions(actionList);
+
+				matchCriteria = new OFMatch();
+
+				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+
+				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+				
+
+				SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+						matchCriteria, instructionsList);
 				
 				log.info(String.format("Removing rule for unreachable host", dstSw.getId(), dstHost.getIPv4Address()));
 				
@@ -535,6 +557,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 	
+					
 	
 					SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 							matchCriteria, instructionsList);
