@@ -198,42 +198,38 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 					matchCriteria, instructionsList);
 			
+			
+			// If the packet is an ARP request, send it to the controller.
+			
+			
+			action = new OFActionOutput();
+			action.setPort(OFPort.OFPP_CONTROLLER);
+
+			actionList = new ArrayList<OFAction>();
+			actionList.add(action);
+			
+			instructions = new OFInstructionApplyActions();
+			instructions.setActions(actionList);
+			
+			
+			matchCriteria = new OFMatch();
+
+			matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_ARP, loadBalancer.getVirtualIP()); 
+			
+			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+			SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+					matchCriteria, instructionsList);
+			
 	
 		}
 		
-		// If the packet is an ARP request, send it to the controller.
-		
-		
-		action = new OFActionOutput();
-		action.setPort(OFPort.OFPP_CONTROLLER);
-
-		actionList = new ArrayList<OFAction>();
-		actionList.add(action);
-		
-		instructions = new OFInstructionApplyActions();
-		instructions.setActions(actionList);
-		
-		
-		matchCriteria = new OFMatch();
-
-		matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_ARP);
-		
-		instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-
-
-		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
-				matchCriteria, instructionsList);
-		
 
 		// Finally, other kind of packets should go to the level-3 routing table.
-
-		OFInstructionGotoTable goToTableInstructions = new OFInstructionGotoTable();
-		goToTableInstructions.setTableId(l3RoutingApp.getTable());
-		
-		
+			
 		matchCriteria = new OFMatch(); // A blank match should work as a wildcard.
 		
-		instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+		instructionsList = Arrays.asList((OFInstruction)new OFInstructionGotoTable().setTableId(l3RoutingApp.getTable()));
 
 		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 				matchCriteria, instructionsList);

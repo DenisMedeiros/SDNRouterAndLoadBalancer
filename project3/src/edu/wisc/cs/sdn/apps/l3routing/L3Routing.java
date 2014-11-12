@@ -493,7 +493,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 			
 			OFActionOutput action;
 			List<OFAction> actionList;
-			OFInstructionApplyActions instructions;
 			OFMatch matchCriteria;
 			List<OFInstruction> instructionsList;
 			
@@ -517,9 +516,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 				actionList = new ArrayList<OFAction>();
 				actionList.add(action);
-
-				instructions = new OFInstructionApplyActions();
-				instructions.setActions(actionList);
 
 				matchCriteria = new OFMatch();
 
@@ -546,9 +542,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	
 					actionList = new ArrayList<OFAction>();
 					actionList.add(action);
-	
-					instructions = new OFInstructionApplyActions();
-					instructions.setActions(actionList);
 	
 					matchCriteria = new OFMatch();
 	
@@ -577,9 +570,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 					// add action to the list of instructions
 					actionList = new ArrayList<OFAction>();
 					actionList.add(action);
-	
-					instructions = new OFInstructionApplyActions();
-					instructions.setActions(actionList);
 	
 					// Construct IP packet
 					matchCriteria = new OFMatch();
