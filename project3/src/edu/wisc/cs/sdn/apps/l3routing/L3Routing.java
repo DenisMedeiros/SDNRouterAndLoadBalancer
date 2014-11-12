@@ -460,7 +460,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		// Relax the weights. 
 
-		for (int i = 1; i < switches.size(); i++) { // We need more one iterator instead of size - 1.
+		for (int i = 1; i < switches.size(); i++) { // We need more one iteration instead of size - 1.
 			
 
 			ArrayList<Link> allLinks = new ArrayList<Link>(this.getLinks());

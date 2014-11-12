@@ -14,13 +14,17 @@ import org.openflow.protocol.OFMessage;
 import org.openflow.protocol.OFOXMField;
 import org.openflow.protocol.OFOXMFieldType;
 import org.openflow.protocol.OFPacketIn;
+import org.openflow.protocol.OFPort;
 import org.openflow.protocol.OFType;
 import org.openflow.protocol.action.OFAction;
 import org.openflow.protocol.action.OFActionOutput;
+
 import org.openflow.protocol.action.OFActionSetField;
 import org.openflow.protocol.action.OFActionType;
 import org.openflow.protocol.instruction.OFInstruction;
 import org.openflow.protocol.instruction.OFInstructionApplyActions;
+import org.openflow.protocol.instruction.OFInstructionGotoTable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,10 +158,86 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		/*       balancer IP to the controller                               */
 		/*       (2) ARP packets to the controller, and                      */
 		/*       (3) all other packets to the next rule table in the switch  */
-		
-		
 		/*********************************************************************/
 		
+		
+		// Installing the rules in the switch
+		
+		OFActionOutput action;
+		List<OFAction> actionList;
+		OFInstructionApplyActions instructions;
+		OFMatch matchCriteria;
+		List<OFInstruction> instructionsList;
+		
+		// If the packet is address to the virtual IP, send it to the controller.
+		
+		Iterator<LoadBalancerInstance> iteratorLoadBalancer = this.instances.values().iterator();
+		
+		while(iteratorLoadBalancer.hasNext()) { // Iterate over all instances (each has one virtual IP).
+			
+			LoadBalancerInstance loadBalancer = (LoadBalancerInstance)iteratorLoadBalancer.next();
+			
+			action = new OFActionOutput();
+			action.setPort(OFPort.OFPP_CONTROLLER);
+
+			actionList = new ArrayList<OFAction>();
+			actionList.add(action);
+			
+			instructions = new OFInstructionApplyActions();
+			instructions.setActions(actionList);
+			
+			
+			matchCriteria = new OFMatch();
+
+			matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+			matchCriteria.setNetworkDestination(loadBalancer.getVirtualIP()); 
+			
+			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+
+			SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+					matchCriteria, instructionsList);
+			
+	
+		}
+		
+		// If the packet is an ARP request, send it to the controller.
+		
+		
+		action = new OFActionOutput();
+		action.setPort(OFPort.OFPP_CONTROLLER);
+
+		actionList = new ArrayList<OFAction>();
+		actionList.add(action);
+		
+		instructions = new OFInstructionApplyActions();
+		instructions.setActions(actionList);
+		
+		
+		matchCriteria = new OFMatch();
+
+		matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_ARP);
+		
+		instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+
+		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+				matchCriteria, instructionsList);
+		
+
+		// Finally, other kind of packets should go to the level-3 routing table.
+
+		OFInstructionGotoTable goToTableInstructions = new OFInstructionGotoTable();
+		goToTableInstructions.setTableId(l3RoutingApp.getTable());
+		
+		
+		matchCriteria = new OFMatch(); // A blank match should work as a wildcard.
+		
+		instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
+
+		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+				matchCriteria, instructionsList);
+
 		
 	}
 	
@@ -277,23 +357,22 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			    	
 
 					OFInstructionApplyActions instructions = new OFInstructionApplyActions();
-					OFActionSetField MAC;
-					OFActionSetField IP;
-					OFActionType type;
+					OFActionSetField MAC = new OFActionSetField();
+					OFActionSetField IP = new OFActionSetField();
 					
 					// set up action field for MAC destination
 					
-					OFOXMField fieldMAC;
+					OFOXMField fieldMAC = new OFOXMField();
 					fieldMAC.setValue(loadBalancer.getVirtualMAC());
-					MAC.setType(OFOXMFieldType.ETH_DST);
+					//MAC.setType(OFOXMFieldType.ETH_DST);
 					MAC.setField(fieldMAC);
 					
 					
 					// set up action field for IP destination
 					
-					OFOXMField fieldIP;
+					OFOXMField fieldIP = new OFOXMField();
 					fieldIP.setValue(loadBalancer.getVirtualIP());
-					IP.setType(OFOXMFieldType.IPV4_DST);
+					//IP.setType(OFOXMFieldType.IPV4_DST);
 					IP.setField(fieldIP);
 					
 					// Set up match criteria for source address of client IP
@@ -331,13 +410,13 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					// set up action field for MAC destination
 					
 					fieldMAC.setValue(loadBalancer.getVirtualMAC());
-					MAC.setType(OFOXMFieldType.ETH_SRC);
+					//MAC.setType(OFOXMFieldType.ETH_SRC);
 					MAC.setField(fieldMAC);
 					
 					// set up action field for IP destination
 
 					fieldIP.setValue(hostIP);
-					IP.setType(OFOXMFieldType.IPV4_SRC);
+					//IP.setType(OFOXMFieldType.IPV4_SRC);
 					IP.setField(fieldIP);
 					
 					
