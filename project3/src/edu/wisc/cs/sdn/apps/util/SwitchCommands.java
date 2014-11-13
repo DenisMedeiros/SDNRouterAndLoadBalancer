@@ -58,7 +58,7 @@ public class SwitchCommands
         rule.setMatch(matchCriteria.clone());
         rule.setInstructions(instructions);
         
-        
+
         int length = OFFlowMod.MINIMUM_LENGTH;
         for (OFInstruction instruction : instructions)
         { length += instruction.getLengthU(); }

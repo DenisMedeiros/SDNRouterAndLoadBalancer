@@ -214,6 +214,7 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			
 			matchCriteria = new OFMatch();
 
+			
 			matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_ARP, loadBalancer.getVirtualIP()); 
 			
 			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
@@ -363,7 +364,6 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					//MAC.setType(OFOXMFieldType.ETH_DST);
 					MAC.setField(fieldMAC);
 					
-					
 					// set up action field for IP destination
 					
 					OFOXMField fieldIP = new OFOXMField();
@@ -374,7 +374,6 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					// Set up match criteria for source address of client IP
 					
 					OFMatch matchCriteria = new OFMatch();
-					
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 					matchCriteria.setNetworkSource(ipPacket.getSourceAddress());
 					matchCriteria.setNetworkDestination(hostIP);
