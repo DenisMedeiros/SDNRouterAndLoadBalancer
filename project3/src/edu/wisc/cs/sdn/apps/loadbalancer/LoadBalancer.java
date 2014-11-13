@@ -50,15 +50,12 @@ import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPv4;
 import net.floodlightcontroller.packet.TCP;
-import net.floodlightcontroller.packet.UDP;
 import net.floodlightcontroller.util.MACAddress;
 
 public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		IOFMessageListener
 {
 	public static final String MODULE_NAME = LoadBalancer.class.getSimpleName();
-	
-	private static int roundRobin = 0 ;
 	
 	private static final byte TCP_FLAG_SYN = 0x02;
 	
@@ -346,6 +343,7 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			    	// get host to return to client
 			    	
 			    	int hostIP = loadBalancer.getNextHostIP();
+			    	byte[] hostMAC = this.getHostMACAddress(hostIP);
 			    	
 			    	
 			    	
@@ -356,22 +354,10 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			    	
 
 					OFInstructionApplyActions instructions = new OFInstructionApplyActions();
-					OFActionSetField MAC = new OFActionSetField();
-					OFActionSetField IP = new OFActionSetField();
 					
-					// set up action field for MAC destination
-					
-					OFOXMField fieldMAC = new OFOXMField();
-					fieldMAC.setValue(loadBalancer.getVirtualMAC());
-					//MAC.setType(OFOXMFieldType.ETH_DST);
-					MAC.setField(fieldMAC);
-					
-					// set up action field for IP destination
-					
-					OFOXMField fieldIP = new OFOXMField();
-					fieldIP.setValue(loadBalancer.getVirtualIP());
-					//IP.setType(OFOXMFieldType.IPV4_DST);
-					IP.setField(fieldIP);
+					OFActionSetField MAC = new OFActionSetField(OFOXMFieldType.ETH_DST, hostMAC);
+					OFActionSetField IP = new OFActionSetField(OFOXMFieldType.IPV4_DST, hostIP);
+
 					
 					// Set up match criteria for source address of client IP
 					
@@ -379,11 +365,13 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 					matchCriteria.setNetworkSource(ipPacket.getSourceAddress());
 					matchCriteria.setNetworkDestination(hostIP);
-					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 					matchCriteria.setNetworkProtocol(OFMatch.IP_PROTO_TCP);
 					
-					// TODO: SET MATCHCRITERIA TO READ SOURCE AND DESTINATION PORT. I COULD NOT FIGURE OUT HOW TO DO THIS
 					
+					// set source and destination port
+					
+					matchCriteria.setField(OFOXMFieldType.TCP_SRC, tcpPacket.getSourcePort());
+					matchCriteria.setField(OFOXMFieldType.TCP_DST, tcpPacket.getDestinationPort());
 					
 					// set up action list of fields
 					List<OFAction> actionList = new ArrayList<OFAction>();
@@ -403,27 +391,16 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			    	 *  server to the client */
 			    	
 					instructions = new OFInstructionApplyActions();
-
-					// set up action field for MAC destination
-					
-					fieldMAC.setValue(loadBalancer.getVirtualMAC());
-					//MAC.setType(OFOXMFieldType.ETH_SRC);
-					MAC.setField(fieldMAC);
-					
-					// set up action field for IP destination
-
-					fieldIP.setValue(hostIP);
-					//IP.setType(OFOXMFieldType.IPV4_SRC);
-					IP.setField(fieldIP);
-					
-					
-					// Set up match criteria for source address of client IP
+					MAC = new OFActionSetField(OFOXMFieldType.ETH_SRC, loadBalancer.getVirtualMAC());
+					IP = new OFActionSetField(OFOXMFieldType.IPV4_SRC, loadBalancer.getVirtualIP());
 					
 					matchCriteria = new OFMatch();
-					
-					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+
 					matchCriteria.setNetworkSource(loadBalancer.getVirtualIP());
 					matchCriteria.setNetworkDestination(ipPacket.getSourceAddress());
+					
+					matchCriteria.setField(OFOXMFieldType.TCP_DST, tcpPacket.getSourcePort());
+					matchCriteria.setField(OFOXMFieldType.TCP_SRC, tcpPacket.getDestinationPort());
 					
 					
 					// set up action list of fields
