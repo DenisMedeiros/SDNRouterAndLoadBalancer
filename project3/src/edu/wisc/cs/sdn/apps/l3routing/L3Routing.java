@@ -504,7 +504,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 				matchCriteria = new OFMatch();
 				
 				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-				matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+				matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, dstHost.getIPv4Address());
 				
 				SwitchCommands.removeRules(srcSw.getSwitch(), this.table, matchCriteria);
 				
@@ -546,7 +546,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 					matchCriteria = new OFMatch();
 	
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-					matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+					matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, dstHost.getIPv4Address());
 	
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 	
@@ -575,7 +575,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 					matchCriteria = new OFMatch();
 	
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-					matchCriteria.setNetworkDestination(dstHost.getIPv4Address());
+					matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, dstHost.getIPv4Address());
 	
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 	

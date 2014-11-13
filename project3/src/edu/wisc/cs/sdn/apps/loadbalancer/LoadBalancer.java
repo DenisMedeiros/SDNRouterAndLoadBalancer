@@ -190,7 +190,8 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			matchCriteria = new OFMatch();
 
 			matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-			matchCriteria.setNetworkDestination(loadBalancer.getVirtualIP()); 
+			matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, loadBalancer.getVirtualIP()); 
+			
 			
 			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 
@@ -214,7 +215,9 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			
 			matchCriteria = new OFMatch();
 
+			matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_ARP);
 			matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_ARP, loadBalancer.getVirtualIP()); 
+		
 			
 			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 
