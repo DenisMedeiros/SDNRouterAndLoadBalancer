@@ -146,14 +146,6 @@ IOFMessageListener
 		IOFSwitch sw = this.floodlightProv.getSwitch(switchId);
 		log.info(String.format("Switch s%d added", switchId));
 
-		/*********************************************************************/
-		/* TODO: Install rules to send:                                      */
-		/*       (1) packets from new connections to each virtual load       */
-		/*       balancer IP to the controller                               */
-		/*       (2) ARP packets to the controller, and                      */
-		/*       (3) all other packets to the next rule table in the switch  */
-		/*********************************************************************/
-
 
 		// Installing the rules in the switch
 
@@ -267,7 +259,13 @@ IOFMessageListener
 				// send ARP reply 
 
 				int virtualIP = IPv4.toIPv4Address(arpPacket.getTargetProtocolAddress());
-				byte[] virtualMAC = instances.get(virtualIP).getVirtualMAC();
+				LoadBalancerInstance loadBalancer = instances.get(virtualIP);
+				
+				if(loadBalancer == null) {
+					return Command.CONTINUE;
+				}
+				
+				byte[] virtualMAC = loadBalancer.getVirtualMAC();
 
 
 				//this.getHostMACAddress(virtualIP);
@@ -314,8 +312,6 @@ IOFMessageListener
 
 				if (tcpPacket.getFlags() != TCP_FLAG_SYN) {
 
-					System.out.println("@@@@@@@@@@@@ Received a NON-SIN! = " + tcpPacket.getFlags());
-
 					// set reset Flags
 					tcpPacket.setFlags((short) TCP_FLAG_RESET);
 					tcpPacket.setDestinationPort(tcpPacket.getSourcePort());
@@ -338,14 +334,10 @@ IOFMessageListener
 					// Get the virtual IP and MAC addresses of the current load balancer.
 
 
-
 					int virtualIP = ipPacket.getDestinationAddress();
 
 					LoadBalancerInstance loadBalancer = this.instances.get(virtualIP);
 					byte[] virtualMAC = loadBalancer.getVirtualMAC();
-
-					System.out.println("@@@@@@@@@@@@ Received a SIN!");
-
 
 					// Get the real IP and MAC from one host of the load balancer.
 
