@@ -61,6 +61,8 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 	
 	private static final byte TCP_FLAG_RESET = 0x04;
 	
+	private static final byte TCP_FLAG_SYN_ACK = 0x12;	
+	
 	private static final short IDLE_TIMEOUT = 20;
 	
 	// Interface to the logging system
@@ -427,6 +429,37 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			                matchCriteria, instructionsList, (short) 0, IDLE_TIMEOUT);
 			    	
 			    	System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INSTALLING RULE 2");
+			    	
+			    	
+			    	// Can we just forward the packet?
+			    	
+			    	System.out.println("RESENDING PACKET!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+			    	
+                    matchCriteria = new OFMatch();
+
+                    matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+                    matchCriteria.setNetworkSource(OFMatch.ETH_TYPE_IPV4, loadBalancer.getVirtualIP());
+                    matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, ipPacket.getSourceAddress());
+                    matchCriteria.setNetworkProtocol(OFMatch.IP_PROTO_TCP);
+
+
+                    instructionsList = Arrays.asList((OFInstruction)new OFInstructionGotoTable().setTableId(l3RoutingApp.getTable()));
+
+                    SwitchCommands.installRule(sw, this.table, (short) (SwitchCommands.DEFAULT_PRIORITY + 4),
+                                    matchCriteria, instructionsList);
+
+                    
+			    	
+			    	ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+			    	
+			    	ethPkt.setSourceMACAddress(getHostMACAddress(hostIP));
+			    	tcpPacket.setFlags(TCP_FLAG_SYN_ACK);
+			    	ipPacket.setPayload(tcpPacket);
+			    	ipPacket.setDestinationAddress(ipPacket.getSourceAddress());
+			    	ipPacket.setSourceAddress(virtualIP);
+			    	ethPkt.setPayload(ipPacket);
+			    	
+			    	SwitchCommands.sendPacket(sw, (short) pktIn.getInPort(), ethPkt);
 
 			    	
 			    	
