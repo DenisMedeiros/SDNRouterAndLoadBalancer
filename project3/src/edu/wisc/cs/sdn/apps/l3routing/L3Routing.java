@@ -498,7 +498,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 			
 			if (srcSw.getCost() == INFINITY) {
 				
-				
 				// host not reachable. send ICMP message
 
 				matchCriteria = new OFMatch();
@@ -551,7 +550,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 	
 					
-	
 					SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 							matchCriteria, instructionsList);
 	
