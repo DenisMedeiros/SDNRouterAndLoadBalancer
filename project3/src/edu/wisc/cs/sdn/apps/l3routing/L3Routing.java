@@ -68,8 +68,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	 */
 	@Override
 	public void init(FloodlightModuleContext context)
-			throws FloodlightModuleException 
-			{
+	throws FloodlightModuleException 
+	{
 		log.info(String.format("Initializing %s...", MODULE_NAME));
 		Map<String,String> config = context.getConfigParams(this);
 		this.table = Byte.parseByte(config.get("table"));
@@ -85,15 +85,15 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		/* TODO: Initialize other class variables, if necessary              */
 
 		/*********************************************************************/
-			}
+	}
 
 	/**
 	 * Subscribes to events and performs other startup tasks.
 	 */
 	@Override
 	public void startUp(FloodlightModuleContext context)
-			throws FloodlightModuleException 
-			{
+	throws FloodlightModuleException 
+	{
 		log.info(String.format("Starting %s...", MODULE_NAME));
 		this.floodlightProv.addOFSwitchListener(this);
 		this.linkDiscProv.addListener(this);
@@ -103,7 +103,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		/* TODO: Perform other tasks, if necessary                           */
 
 		/*********************************************************************/
-			}
+	}
 
 	/**
 	 * Get the table in which this application installs rules.
@@ -268,7 +268,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	@Override
 	public void linkDiscoveryUpdate(List<LDUpdate> updateList) 
 	{
-		
+
 
 
 		for (LDUpdate update : updateList)
@@ -391,7 +391,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() 
 	{
 		Collection<Class<? extends IFloodlightService>> services =
-				new ArrayList<Class<? extends IFloodlightService>>();
+			new ArrayList<Class<? extends IFloodlightService>>();
 		services.add(IL3Routing.class);
 		return services; 
 	}
@@ -404,8 +404,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	getServiceImpls() 
 	{ 
 		Map<Class<? extends IFloodlightService>, IFloodlightService> services =
-				new HashMap<Class<? extends IFloodlightService>, 
-				IFloodlightService>();
+			new HashMap<Class<? extends IFloodlightService>, 
+			IFloodlightService>();
 		// We are the class that implements the service
 		services.put(IL3Routing.class, this);
 		return services;
@@ -419,7 +419,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 	getModuleDependencies() 
 	{
 		Collection<Class<? extends IFloodlightService >> modules =
-				new ArrayList<Class<? extends IFloodlightService>>();
+			new ArrayList<Class<? extends IFloodlightService>>();
 		modules.add(IFloodlightProviderService.class);
 		modules.add(ILinkDiscoveryService.class);
 		modules.add(IDeviceService.class);
@@ -438,13 +438,15 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 	private void bellmanFord(Host dstHost) {
 
+
+
 		// Initially, add all switches to a switch list.
 		Map<Long, BellFordVertex> switches = new HashMap<Long, BellFordVertex>();
 
 		// This is the switch that the host is plugged.
 		IOFSwitch dstSw = dstHost.getSwitch();
-		
-		
+
+
 
 		// Set all costs to infinity, except for the source which is set to 0.
 
@@ -461,7 +463,7 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		// Relax the weights. 
 
 		for (int i = 1; i < switches.size(); i++) { // We need more one iteration instead of size - 1.
-			
+
 
 			ArrayList<Link> allLinks = new ArrayList<Link>(this.getLinks());
 
@@ -478,8 +480,8 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 					vertexV.setOutPort(link.getDstPort());
 					vertexV.setCost(vertexU.getCost() + 1);
-					
-					
+
+
 				}
 
 			}
@@ -489,27 +491,28 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		// Installing the rules based on the previous result.	
 
+
 		for (BellFordVertex srcSw: switches.values()) {
-			
+
 			OFActionOutput action;
 			List<OFAction> actionList;
 			OFMatch matchCriteria;
 			List<OFInstruction> instructionsList;
-			
+
 			if (srcSw.getCost() == INFINITY) {
-				
+
 				// host not reachable. send ICMP message
 
 				matchCriteria = new OFMatch();
-				
+
 				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 				matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, dstHost.getIPv4Address());
-				
+
 				SwitchCommands.removeRules(srcSw.getSwitch(), this.table, matchCriteria);
-				
-				
+
+
 				// handle removed destination host
-				
+
 				action = new OFActionOutput();
 				action.setPort(OFPort.OFPP_IN_PORT);
 
@@ -520,72 +523,72 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 				matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 
-				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-
-				
+				instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));	
 
 				SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 						matchCriteria, instructionsList);
-				
+
 				log.info(String.format("Removing rule for unreachable host", dstSw.getId(), dstHost.getIPv4Address()));
-				
+
 			} else {
-	
+
 				// If the switch is the final in the path, then redirect the packets to
 				// the port where the host is connected.
-	
+
 				if (srcSw.getSwitch().equals(dstSw)) {
-	
+
 					action = new OFActionOutput();
 					action.setPort(dstHost.getPort());
-	
+
 					actionList = new ArrayList<OFAction>();
 					actionList.add(action);
-	
+
 					matchCriteria = new OFMatch();
-	
+
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 					matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, dstHost.getIPv4Address());
-	
+
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-	
-					
+
 					SwitchCommands.installRule(dstSw, this.table, SwitchCommands.DEFAULT_PRIORITY,
 							matchCriteria, instructionsList);
-	
+
+
 					// If the switch is not the final in the path, then forward the packets to the next hop.	
-					
+
 					log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch is connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
-	
+
 				} else {
-	
+
 					// If the switch is not the final in the path, then forward the packets to the next hop.	
-	
+
 					// create a new action with appropriate outgoing port
 					action = new OFActionOutput();
 					action.setPort(srcSw.getOutPort());
-	
+
 					// add action to the list of instructions
 					actionList = new ArrayList<OFAction>();
 					actionList.add(action);
-	
+
 					// Construct IP packet
 					matchCriteria = new OFMatch();
-	
+
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
 					matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, dstHost.getIPv4Address());
-	
+
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
-	
+
 					SwitchCommands.installRule(srcSw.getSwitch(), this.table, SwitchCommands.DEFAULT_PRIORITY,
 							matchCriteria, instructionsList);
-	
-	
+
+
 					log.info(String.format("Adding rule for switch ID %d for IP host %d. This switch ISNOT connected to the host", dstSw.getId(), dstHost.getIPv4Address()));
-	
+
 				}
 			}
 		}
+
+
 
 	}
 

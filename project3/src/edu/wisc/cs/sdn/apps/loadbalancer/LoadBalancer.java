@@ -193,7 +193,7 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 
 
-			SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+			SwitchCommands.installRule(sw, this.table, (short) (SwitchCommands.DEFAULT_PRIORITY + 1),
 					matchCriteria, instructionsList);
 			
 			
@@ -218,7 +218,7 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			
 			instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 
-			SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+			SwitchCommands.installRule(sw, this.table, (short) (SwitchCommands.DEFAULT_PRIORITY + 1),
 					matchCriteria, instructionsList);
 			
 	
@@ -231,7 +231,7 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 		
 		instructionsList = Arrays.asList((OFInstruction)new OFInstructionGotoTable().setTableId(l3RoutingApp.getTable()));
 
-		SwitchCommands.installRule(sw, this.table, SwitchCommands.DEFAULT_PRIORITY,
+		SwitchCommands.installRule(sw, this.table, (short) (SwitchCommands.DEFAULT_PRIORITY + 0),
 				matchCriteria, instructionsList);
 
 		
@@ -258,8 +258,13 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 				pktIn.getPacketData().length);
 		
 		
+		System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A PACKET!");
+		
+		
 			// Case 1: Arp Request
 		if (ethPkt.getEtherType() == Ethernet.TYPE_ARP) {
+			
+			System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A ARP PACKET!");
 			
 			ARP arpPacket = (ARP)ethPkt.getPayload();
 			
@@ -268,10 +273,15 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			
 			if (arpPacket.getOpCode() == ARP.OP_REQUEST) {
 				
+				System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A ARP REQUEST!");
+				
 				// send ARP reply 
 				
 				int virtualIP = IPv4.toIPv4Address(arpPacket.getTargetProtocolAddress());
-				byte[] virtualMAC = this.getHostMACAddress(virtualIP);
+				byte[] virtualMAC = instances.get(virtualIP).getVirtualMAC();
+					
+					
+				//this.getHostMACAddress(virtualIP);
 				
 				if (virtualMAC == null) {
 					// TODO: error, mac not found
@@ -279,15 +289,16 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 				
 				// reconstruct ARP packet
 				
-				ARP arpReply = new ARP();
-				arpReply.setOpCode(ARP.OP_REPLY);
-				arpReply.setTargetHardwareAddress(arpPacket.getSenderHardwareAddress());
-				arpReply.setTargetProtocolAddress(arpPacket.getSenderProtocolAddress());
-				arpReply.setSenderHardwareAddress(virtualMAC);
-				arpReply.setSenderProtocolAddress(IPv4.toIPv4AddressBytes(virtualIP));
+				arpPacket.setOpCode(ARP.OP_REPLY);
+				arpPacket.setTargetHardwareAddress(arpPacket.getSenderHardwareAddress());
+				arpPacket.setTargetProtocolAddress(arpPacket.getSenderProtocolAddress());
+				arpPacket.setSenderHardwareAddress(virtualMAC);
+				arpPacket.setSenderProtocolAddress(IPv4.toIPv4AddressBytes(virtualIP));
 				
 				
 				// reset ethernet fields for source and destination MAC addresses
+				
+				ethPkt.setPayload(arpPacket);
 				
 				ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
 				ethPkt.setSourceMACAddress(virtualMAC);
@@ -302,6 +313,8 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			
 		} else if  (ethPkt.getEtherType() == Ethernet.TYPE_IPv4) {
 			
+			System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A IPV4 PACKET!");
+			
 			IPv4 ipPacket = null;
 			ipPacket = (IPv4)ethPkt.getPayload();
 			
@@ -309,9 +322,13 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			
 			if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
 				
+				System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A TCP PACKET!");
+				
 				TCP tcpPacket = (TCP) ipPacket.getPayload();
 
-			    if (tcpPacket.getFlags() == TCP_FLAG_SYN) {
+			    if (tcpPacket.getFlags() != TCP_FLAG_SYN) {
+			    	
+			    	System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A TCP NON SYN PACKET!");
 			    	
 			    	
 			    	// set reset Flags
@@ -331,6 +348,8 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					
 			    } else {
 			    	
+			    	System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ RECEIVED A TCP SYN PACKET!");
+			    	
 			    	// TCP packet is of type SYN, connection is initializing
 			    	
 			    	// get the IP address of the current load balancer
@@ -344,7 +363,6 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 			    	
 			    	int hostIP = loadBalancer.getNextHostIP();
 			    	byte[] hostMAC = this.getHostMACAddress(hostIP);
-			    	
 			    	
 			    	
 			    	/*
@@ -362,16 +380,11 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					// Set up match criteria for source address of client IP
 					
 					OFMatch matchCriteria = new OFMatch();
+					
 					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
-					matchCriteria.setNetworkSource(ipPacket.getSourceAddress());
-					matchCriteria.setNetworkDestination(hostIP);
+					matchCriteria.setNetworkSource(OFMatch.ETH_TYPE_IPV4, ipPacket.getSourceAddress());
+					matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, virtualIP);
 					matchCriteria.setNetworkProtocol(OFMatch.IP_PROTO_TCP);
-					
-					
-					// set source and destination port
-					
-					matchCriteria.setField(OFOXMFieldType.TCP_SRC, tcpPacket.getSourcePort());
-					matchCriteria.setField(OFOXMFieldType.TCP_DST, tcpPacket.getDestinationPort());
 					
 					// set up action list of fields
 					List<OFAction> actionList = new ArrayList<OFAction>();
@@ -381,9 +394,10 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					
 					List<OFInstruction> instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 					
-			    	SwitchCommands.installRule(sw, sw.getTables(), SwitchCommands.MAX_PRIORITY,
+			    	SwitchCommands.installRule(sw, this.table, SwitchCommands.MAX_PRIORITY,
 			                matchCriteria, instructionsList, (short) 0, IDLE_TIMEOUT);
 			    	
+			    	System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INSTALLING RULE 1");
 			    	
 			    	
 			    	
@@ -396,11 +410,9 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					
 					matchCriteria = new OFMatch();
 
-					matchCriteria.setNetworkSource(loadBalancer.getVirtualIP());
-					matchCriteria.setNetworkDestination(ipPacket.getSourceAddress());
-					
-					matchCriteria.setField(OFOXMFieldType.TCP_DST, tcpPacket.getSourcePort());
-					matchCriteria.setField(OFOXMFieldType.TCP_SRC, tcpPacket.getDestinationPort());
+					matchCriteria.setDataLayerType(OFMatch.ETH_TYPE_IPV4);
+					matchCriteria.setNetworkSource(OFMatch.ETH_TYPE_IPV4, hostIP);
+					matchCriteria.setNetworkDestination(OFMatch.ETH_TYPE_IPV4, ipPacket.getSourceAddress());
 					
 					
 					// set up action list of fields
@@ -411,8 +423,10 @@ public class LoadBalancer implements IFloodlightModule, IOFSwitchListener,
 					
 					instructionsList = Arrays.asList((OFInstruction)new OFInstructionApplyActions().setActions(actionList));
 					
-			    	SwitchCommands.installRule(sw, sw.getTables(), SwitchCommands.MAX_PRIORITY,
+			    	SwitchCommands.installRule(sw, this.table, SwitchCommands.MAX_PRIORITY,
 			                matchCriteria, instructionsList, (short) 0, IDLE_TIMEOUT);
+			    	
+			    	System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ INSTALLING RULE 2");
 
 			    	
 			    	
