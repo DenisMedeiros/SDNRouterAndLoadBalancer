@@ -56,7 +56,7 @@ IOFMessageListener
 
 	private static final byte TCP_FLAG_SYN = 0x02;
 
-	private static final byte TCP_FLAG_RESET = 0x04;
+	private static final short TCP_FLAG_RESET = 0x004;
 
 	private static final short IDLE_TIMEOUT = 20;
 
@@ -303,25 +303,45 @@ IOFMessageListener
 			IPv4 ipPacket = null;
 			ipPacket = (IPv4)ethPkt.getPayload();
 
-			// Check whether Packet is of type TCP
+			// Check whether Packet is of type TCP.
 
 			if (ipPacket.getProtocol() == IPv4.PROTOCOL_TCP) {
-
 
 				TCP tcpPacket = (TCP) ipPacket.getPayload();
 
 				if (tcpPacket.getFlags() != TCP_FLAG_SYN) {
-
+					
+					
+					log.info(String.format("<<<<<<<<<<<< Sending a TCP RESET >>>>>>>>>>>"));
+					
 					// set reset Flags
 					tcpPacket.setFlags((short) TCP_FLAG_RESET);
-					tcpPacket.setDestinationPort(tcpPacket.getSourcePort());
-					tcpPacket.setSourcePort((short) pktIn.getInPort());
+					
+					short sourcePort = tcpPacket.getSourcePort();
+					tcpPacket.setSourcePort(tcpPacket.getDestinationPort());
+					tcpPacket.setDestinationPort(sourcePort);
+					tcpPacket.setWindowSize((short)0);		
+					tcpPacket.setSequence(tcpPacket.getAcknowledge());
+					tcpPacket.setAcknowledge(0);
 
+					tcpPacket.setChecksum((short) 0);
+					tcpPacket.serialize();
+					
+					
+					ipPacket.setPayload(tcpPacket);
+					int sourceAddr = ipPacket.getSourceAddress();
+					ipPacket.setSourceAddress(ipPacket.getDestinationAddress());
+					ipPacket.setDestinationAddress(sourceAddr);
+					
+					ipPacket.setChecksum((short) 0);
+					ipPacket.serialize();
 
 					// reset ethernet fields for source and destination MAC addresses
 
+					ethPkt.setPayload(ipPacket);
+					byte[] sourceMAC = ethPkt.getSourceMACAddress();
 					ethPkt.setSourceMACAddress(ethPkt.getDestinationMACAddress());
-					ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
+					ethPkt.setDestinationMACAddress(sourceMAC);
 
 
 					// send packet
