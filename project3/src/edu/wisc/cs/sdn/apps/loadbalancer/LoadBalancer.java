@@ -301,7 +301,6 @@ IOFMessageListener
 				
 				if (tcpPacket.getFlags() != TCP_FLAG_SYN) {
 					
-					log.info(String.format("Sending a TCP RESET"));
 					
 					// set reset Flags
 					tcpPacket.setFlags((short) TCP_FLAG_RESET);
