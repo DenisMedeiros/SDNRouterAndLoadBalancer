@@ -113,10 +113,6 @@ IOFMessageListener
 		this.deviceProv = context.getServiceImpl(IDeviceService.class);
 		this.l3RoutingApp = context.getServiceImpl(IL3Routing.class);
 
-		/*********************************************************************/
-		/* TODO: Initialize other class variables, if necessary              */
-
-		/*********************************************************************/
 			}
 
 	/**
@@ -130,10 +126,6 @@ IOFMessageListener
 		this.floodlightProv.addOFSwitchListener(this);
 		this.floodlightProv.addOFMessageListener(OFType.PACKET_IN, this);
 
-		/*********************************************************************/
-		/* TODO: Perform other tasks, if necessary                           */
-
-		/*********************************************************************/
 			}
 
 	/**
@@ -267,13 +259,7 @@ IOFMessageListener
 				
 				byte[] virtualMAC = loadBalancer.getVirtualMAC();
 
-
-				//this.getHostMACAddress(virtualIP);
-
-				if (virtualMAC == null) {
-					// TODO: error, mac not found
-				}
-
+				
 				// reconstruct ARP packet
 
 				arpPacket.setOpCode(ARP.OP_REPLY);
@@ -286,7 +272,6 @@ IOFMessageListener
 				// reset ethernet fields for source and destination MAC addresses
 
 				ethPkt.setPayload(arpPacket);
-
 				ethPkt.setDestinationMACAddress(ethPkt.getSourceMACAddress());
 				ethPkt.setSourceMACAddress(virtualMAC);
 
@@ -296,7 +281,7 @@ IOFMessageListener
 				SwitchCommands.sendPacket(sw, (short) pktIn.getInPort(), ethPkt);
 			}
 
-			// Case 2: TCP, not a syn request
+			// Handle TCP Packets
 
 		} else if  (ethPkt.getEtherType() == Ethernet.TYPE_IPv4) {
 
@@ -309,10 +294,14 @@ IOFMessageListener
 
 				TCP tcpPacket = (TCP) ipPacket.getPayload();
 
+				
+				
+				// Handle cases where packets are not of type syn. Send a TCP 
+				// reset when this occurs
+				
 				if (tcpPacket.getFlags() != TCP_FLAG_SYN) {
 					
-					
-					log.info(String.format("<<<<<<<<<<<< Sending a TCP RESET >>>>>>>>>>>"));
+					log.info(String.format("Sending a TCP RESET"));
 					
 					// set reset Flags
 					tcpPacket.setFlags((short) TCP_FLAG_RESET);
@@ -336,6 +325,7 @@ IOFMessageListener
 					ipPacket.setChecksum((short) 0);
 					ipPacket.serialize();
 
+					
 					// reset ethernet fields for source and destination MAC addresses
 
 					ethPkt.setPayload(ipPacket);
@@ -351,9 +341,6 @@ IOFMessageListener
 
 					// TCP packet is of type SYN, connection is initializing.
 
-					// Get the virtual IP and MAC addresses of the current load balancer.
-
-
 					int virtualIP = ipPacket.getDestinationAddress();
 
 					LoadBalancerInstance loadBalancer = this.instances.get(virtualIP);
@@ -364,8 +351,8 @@ IOFMessageListener
 					int hostIP = loadBalancer.getNextHostIP();
 					byte[] hostMAC = this.getHostMACAddress(hostIP);
 
+					
 					// Modify the packet coming from the client to the virtual IP.
-
 
 					OFActionSetField dstMAC = new OFActionSetField(OFOXMFieldType.ETH_DST, hostMAC);
 					OFActionSetField dstIP = new OFActionSetField(OFOXMFieldType.IPV4_DST, hostIP);
@@ -426,8 +413,8 @@ IOFMessageListener
 						matchCriteria.setTransportDestination(OFMatch.IP_PROTO_TCP, tcpPacket.getSourcePort());
 						
 
-
 						// set up action list of fields
+						
 						actionList = new ArrayList<OFAction>();
 						actionList.add(dstMAC);
 						actionList.add(dstIP);

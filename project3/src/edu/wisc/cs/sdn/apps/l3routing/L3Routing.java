@@ -81,11 +81,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		this.deviceProv = context.getServiceImpl(IDeviceService.class);
 
 		this.knownHosts = new ConcurrentHashMap<IDevice,Host>();
-
-		/*********************************************************************/
-		/* TODO: Initialize other class variables, if necessary              */
-
-		/*********************************************************************/
 			}
 
 	/**
@@ -100,10 +95,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		this.linkDiscProv.addListener(this);
 		this.deviceProv.addListener(this);
 
-		/*********************************************************************/
-		/* TODO: Perform other tasks, if necessary                           */
-
-		/*********************************************************************/
 			}
 
 	/**
@@ -427,6 +418,10 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 		return modules;
 	}
 
+	
+	/* 
+	 * Calls bellmanFord shortest path calculation on all of the hosts
+	 */
 	private void bellmanFord() {
 
 		for(Host host : this.getHosts()) {
@@ -437,8 +432,13 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 	}
 
+	
+	/*
+	 * Calls bellmanFord shortest path calculation on 1 host
+	 * @parm dstHost the host whos shortest path is calculated
+	 * to all other hosts
+	 */
 	private void bellmanFord(Host dstHost) {
-
 
 
 		// Initially, add all switches to a switch list.
@@ -446,7 +446,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 		// This is the switch that the host is plugged.
 		IOFSwitch dstSw = dstHost.getSwitch();
-
 
 
 		// Set all costs to infinity, except for the source which is set to 0.
@@ -461,10 +460,10 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 			switches.put(sw.getId(), tempVertex);
 		}
 
+		
 		// Relax the weights. 
 
-		for (int i = 1; i < switches.size(); i++) { // We need more one iteration instead of size - 1.
-
+		for (int i = 1; i < switches.size(); i++) { 
 
 			ArrayList<Link> allLinks = new ArrayList<Link>(this.getLinks());
 
@@ -491,7 +490,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 
 		// Installing the rules based on the previous result.	
-
 
 		for (BellFordVertex srcSw: switches.values()) {
 
@@ -525,8 +523,6 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 
 				// If the switch is not the final in the path, then forward the packets to the next hop.	
 
-				log.info(String.format("Adding rule for switch ID %d for IP host %s. This switch is connected to the host", dstSw.getId(), IPv4.fromIPv4Address(dstHost.getIPv4Address())));
-
 			} else {
 
 				// If the switch is not the final in the path, then forward the packets to the next hop.	
@@ -551,13 +547,15 @@ ILinkDiscoveryListener, IDeviceListener, IL3Routing
 						matchCriteria, instructionsList);
 
 
-				log.info(String.format("Adding rule for switch ID %d for IP host %s. This switch ISNOT connected to the host", dstSw.getId(), IPv4.fromIPv4Address(dstHost.getIPv4Address())));
-
 			}
 		}
 	}
 
 
+	/*
+	 * Removes hosts from the list of hosts.
+	 * @param host  The host to be removed
+	 */
 	private void removeHost(Host host) {
 
 		// set up match information to be used for removal
